@@ -1,9 +1,9 @@
 # RCOMfirst
 
 Virtual Serial Ports
-  Terminal 0:
-    sudo socat -d  -d  PTY,link=/dev/ttyS10,mode=777   PTY,link=/dev/ttyS11,mode=777
-  Terminal 1:
-    ./program /dev/ttyS10
-  Terminal 2:
-    ./program /dev/ttyS11
+  <br>Terminal 0:
+    <br>sudo socat -d  -d  PTY,link=/dev/ttyS10,mode=777   PTY,link=/dev/ttyS11,mode=777
+  <br>Terminal 1:
+    <br><t>./program /dev/ttyS10
+  <br>Terminal 2:
+    <br><t>./program /dev/ttyS11
