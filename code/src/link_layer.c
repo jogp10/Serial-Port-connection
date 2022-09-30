@@ -12,8 +12,8 @@ int llopen(LinkLayer connectionParameters)
 {
     // TODO
 
-    const char *serialPortName = connectionParameters->serialPort;
-    LinkLayerRole role = connectionParameters->role;
+    const char *serialPortName = connectionParameters.serialPort;
+    LinkLayerRole role = connectionParameters.role;
 
     // Open serial port device for reading and writing, and not as controlling tty
     // because we don't want to get killed if linenoise sends CTRL-C.
@@ -38,13 +38,13 @@ int llopen(LinkLayer connectionParameters)
     // Clear struct for new port settings
     memset(&newtio, 0, sizeof(newtio));
 
-    newtio.c_cflag = connectionParameters->baudRate | CS8 | CLOCAL | CREAD;
+    newtio.c_cflag = connectionParameters.baudRate | CS8 | CLOCAL | CREAD;
     newtio.c_iflag = IGNPAR;
     newtio.c_oflag = 0;
 
     // Set input mode (non-canonical, no echo,...)
     newtio.c_lflag = 0;
-    newtio.c_cc[VTIME] = connectionParameters->timeout; // Inter-character timer
+    newtio.c_cc[VTIME] = connectionParameters.timeout; // Inter-character timer
     newtio.c_cc[VMIN] = 1;  // Blocking read until 1 chars received
 
     // VTIME e VMIN should be changed in order to protect with a
