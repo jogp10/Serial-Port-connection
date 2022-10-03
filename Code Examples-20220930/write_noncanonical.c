@@ -67,7 +67,7 @@ int main(int argc, char *argv[])
 
     // Set input mode (non-canonical, no echo,...)
     newtio.c_lflag = 0;
-    newtio.c_cc[VTIME] = 4; // Inter-character timer unused
+    newtio.c_cc[VTIME] = 0; // Inter-character timer unused
     newtio.c_cc[VMIN] = 1;  // Blocking read until 1 chars received
 
     // VTIME e VMIN should be changed in order to protect with a
@@ -95,7 +95,7 @@ int main(int argc, char *argv[])
 
     fgets(buf, BUF_SIZE, stdin);
 
-    int bytes = write(fd, buf, strlen(buf));
+    int bytes = write(fd, buf, strlen(buf) + 1);
     printf("%d bytes written\n", bytes);
 
     // Wait until all bytes have been written to the serial port
