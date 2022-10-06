@@ -11,6 +11,8 @@
 #include <termios.h>
 #include <unistd.h>
 
+#include "state_machine.h"
+
 // Baudrate settings are defined in <asm/termbits.h>, which is
 // included by <termios.h>
 #define BAUDRATE B38400
@@ -21,7 +23,7 @@
 
 #define BUF_SIZE 256
 
-volatile int STOP = FALSE;
+enum STATE state = START;
 
 int main(int argc, char *argv[])
 {
@@ -91,15 +93,31 @@ int main(int argc, char *argv[])
 
 
     /** Read string from stdin */
-    unsigned char buf[BUF_SIZE] = {0};
+    unsigned char buf[BUF_SIZE + 1] = {0};
 
-    fgets(buf, BUF_SIZE, stdin);
+    buf[0] = FLAG;
+    buf[1] = A_SENDER;
+    buf[2] = SET;
+    buf[3] = buf[1] ^ buf[2];
+    buf[4] = FLAG;
 
-    int bytes = write(fd, buf, strlen(buf) + 1);
+
+    int bytes = write(fd, buf, SET_SIZE);
     printf("%d bytes written\n", bytes);
 
     // Wait until all bytes have been written to the serial port
-    sleep(1);
+
+    // Read from serial port
+    while (1)
+    {
+        // Returns after 1 chars have been input
+        read(fd, buf, 1);
+
+        if ( (state = next_state(state, *buf)) == STOP) {
+            printf("UA received\n");
+            break;
+        }
+    }
 
     // Restore the old port settings
     if (tcsetattr(fd, TCSANOW, &oldtio) == -1)
@@ -112,3 +130,31 @@ int main(int argc, char *argv[])
 
     return 0;
 }
+
+/**
+ * while (alarmCount < 3 && state != STOP)
+    {
+        if (alarmEnabled == FALSE)
+        {
+
+            int bytes = write(fd, buf, SET_SIZE);
+            fprintf(stderr, "%d bytes written\n", bytes);
+
+            state = START;
+
+            alarm(3); // Set alarm to be triggered in 3s
+            alarmEnabled = TRUE;
+        }
+
+        // Read from serial port
+        // Returns after 1 chars have been input
+        while (1) {
+            fprintf(stderr, "Reading from serial port   \r");
+            read(fd, buf, 1);
+            if ( (state = next_state(state, *buf)) == STOP) {
+                printf("UA received\n");
+                break;
+            }
+        }
+    }
+    */

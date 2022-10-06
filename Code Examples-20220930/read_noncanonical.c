@@ -11,6 +11,8 @@
 #include <termios.h>
 #include <unistd.h>
 
+#include "state_machine.h"
+
 // Baudrate settings are defined in <asm/termbits.h>, which is
 // included by <termios.h>
 #define BAUDRATE B38400
@@ -21,7 +23,7 @@
 
 #define BUF_SIZE 256
 
-volatile int STOP = FALSE;
+enum STATE state = START;
 
 int main(int argc, char *argv[])
 {
@@ -90,21 +92,26 @@ int main(int argc, char *argv[])
 
     // Loop for input
     unsigned char buf[BUF_SIZE + 1] = {0}; // +1: Save space for the final '\0' char
-    int nCharsRead = 0;
-    char c;
 
-    while ( STOP == FALSE)
+    while (1)
     {
         // Returns after 1 chars have been input
-        int bytes = read(fd, buf + nCharsRead, 1);
+        read(fd, buf, 1);
 
-        if (buf[nCharsRead] == '\0')
-            STOP = TRUE;
-
-        nCharsRead++;
+        if ( (state = next_state(state, *buf)) == STOP) {
+            printf("SET received\n");
+            break;
+        }
     }
 
-    printf("%s", buf);
+    buf[0] = FLAG;
+    buf[1] = A_SENDER;
+    buf[2] = UA;
+    buf[3] = buf[1] ^ buf[2];
+    buf[4] = FLAG;
+
+    int bytes = write(fd, buf, UA_SIZE);
+    printf("Sent %d bytes\n", bytes);
 
     // The while() cycle should be changed in order to respect the specifications
     // of the protocol indicated in the Lab guide
