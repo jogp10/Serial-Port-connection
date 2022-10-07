@@ -12,6 +12,7 @@
 #include <unistd.h>
 
 #include "state_machine.h"
+#include "alarm.c"
 
 // Baudrate settings are defined in <asm/termbits.h>, which is
 // included by <termios.h>
@@ -29,6 +30,7 @@ int main(int argc, char *argv[])
 {
     // Program usage: Uses either COM1 or COM2
     const char *serialPortName = argv[1];
+    (void)signal(SIGALRM, alarmHandler);
 
     if (argc < 2)
     {
@@ -70,7 +72,7 @@ int main(int argc, char *argv[])
     // Set input mode (non-canonical, no echo,...)
     newtio.c_lflag = 0;
     newtio.c_cc[VTIME] = 0; // Inter-character timer unused
-    newtio.c_cc[VMIN] = 1;  // Blocking read until 1 chars received
+    newtio.c_cc[VMIN] = 0;  // Blocking read until 1 chars received
 
     // VTIME e VMIN should be changed in order to protect with a
     // timeout the reception of the following character(s)
@@ -91,7 +93,6 @@ int main(int argc, char *argv[])
 
     printf("New termios structure set\n");
 
-
     /** Read string from stdin */
     unsigned char buf[BUF_SIZE + 1] = {0};
 
@@ -101,19 +102,27 @@ int main(int argc, char *argv[])
     buf[3] = buf[1] ^ buf[2];
     buf[4] = FLAG;
 
-
-    int bytes = write(fd, buf, SET_SIZE);
-    printf("%d bytes written\n", bytes);
-
-    // Wait until all bytes have been written to the serial port
-
-    // Read from serial port
-    while (1)
+    while (alarmCount < 3 && state != STOP)
     {
-        // Returns after 1 chars have been input
-        read(fd, buf, 1);
+        if (alarmEnabled == FALSE)
+        {
 
-        if ( (state = next_state(state, *buf)) == STOP) {
+            int bytes = write(fd, buf, SET_SIZE);
+            fprintf(stderr, "%d bytes written\n", bytes);
+
+            state = START;
+
+            alarm(3); // Set alarm to be triggered in 3s
+            alarmEnabled = TRUE;
+        }
+
+        // Read from serial port
+        // Returns after 1 chars have been input
+        int bytes = read(fd, buf, 1);
+        if (bytes <= 0)
+            continue;
+        if ((state = next_state(state, *buf)) == STOP)
+        {
             printf("UA received\n");
             break;
         }
@@ -130,31 +139,3 @@ int main(int argc, char *argv[])
 
     return 0;
 }
-
-/**
- * while (alarmCount < 3 && state != STOP)
-    {
-        if (alarmEnabled == FALSE)
-        {
-
-            int bytes = write(fd, buf, SET_SIZE);
-            fprintf(stderr, "%d bytes written\n", bytes);
-
-            state = START;
-
-            alarm(3); // Set alarm to be triggered in 3s
-            alarmEnabled = TRUE;
-        }
-
-        // Read from serial port
-        // Returns after 1 chars have been input
-        while (1) {
-            fprintf(stderr, "Reading from serial port   \r");
-            read(fd, buf, 1);
-            if ( (state = next_state(state, *buf)) == STOP) {
-                printf("UA received\n");
-                break;
-            }
-        }
-    }
-    */
