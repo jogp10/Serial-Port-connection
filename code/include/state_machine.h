@@ -7,6 +7,7 @@
 
 #define SET_SIZE    6
 #define UA_SIZE     6
+#define DISC_SIZE   6
 
 #define A_SENDER    0x03 // 0000 0011
 #define A_RECEIVER  0x01 // 0000 0001
