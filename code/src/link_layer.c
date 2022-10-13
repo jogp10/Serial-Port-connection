@@ -228,43 +228,65 @@ int llclose_tx(int fd) {
 
         // Read from serial port
         // Returns after 1 chars have been input
-        int bytes = read(fd, buf, 1);
-        if (bytes <= 0)
+        int bytes;
+        if ((bytes = read(fd, buf, 1)) <= 0) {
+            if (bytes<0) exit(-1);
             continue;
+        }
         if ((state = next_state(state, *buf)) == STOP)
         {
             printf("DISC received\n");
         }
     }
 
-    // Send DISC
+    // Send UA
     buf[0] = FLAG;
     buf[1] = A_SENDER;
-    buf[2] = DISC;
+    buf[2] = UA;
     buf[3] = buf[1] ^ buf[2];
     buf[4] = FLAG;
 
-    if (!write(fd, buf, DISC_SIZE)) {
-        printf("Error sending DISC\n");
+    if (!write(fd, buf, UA_SIZE)) {
+        printf("Error sending UA\n");
         exit(-1);
     }
 
-    printf("Sent DISC\n");
+    printf("Sent UA\n");
 
     return state == STOP;
 }
 
 
 int llclose_rx(int fd){
+    unsigned char buf[BUF_SIZE + 1];
+
+    // Receive DISC
+    enum STATE state = START;
+    while (1)
+    {
+        // Returns after 1 chars have been input
+        read(fd, buf, 1);
+
+        // Process byte
+        if ( (state = next_state(state, *buf)) == STOP) {
+            printf("SET received\n");
+            break;
+        }
+    }
+
+    // Send DISC
 
     // Mount DISC
+    buf[0] = FLAG;
+    buf[1] = A_SENDER;
+    buf[2] = DISC;
+    buf[3] = buf[1] ^ buf[2];
+    buf[4] = FLAG;
+
+    // Set alarm
     (void)signal(SIGALRM, alarmHandler);
     alarmEnabled = FALSE;
     alarmCount = 0;
-
-    unsigned char buf[BUF_SIZE + 1] = {FLAG, A_RECEIVER, DISC, A_RECEIVER ^ DISC, FLAG, '\0'};
-
-    enum STATE state = START;
 
     while (alarmCount < nRetries && state != STOP)
     {
@@ -281,14 +303,18 @@ int llclose_rx(int fd){
 
         // Read from serial port
         // Returns after 1 chars have been input
-        int bytes = read(fd, buf, 1);
-        if (bytes <= 0)
+        int bytes;
+        if ((bytes = read(fd, buf, 1)) <= 0) {
+            if (bytes<0) exit(-1);
             continue;
+        }
+        
         if ((state = next_state(state, *buf)) == STOP)
         {
-            printf("DISC received\n");
+            printf("UA received\n");
             break;
         }
     }
 
     return state == STOP;
+}
