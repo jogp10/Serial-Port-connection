@@ -59,7 +59,7 @@ enum STATE next_state(enum STATE state, unsigned char byte) {
             }
             break;
         case A_RCV:
-            if (byte == SET || byte == UA || byte == DISC || byte && ACK == RR || byte && ACK == REJ) {
+            if (byte == SET || byte == UA || byte == DISC || (byte && ACK == RR) || (byte && ACK == REJ)) {
                 return C_RCV;
             }
             else if (byte == FLAG) {

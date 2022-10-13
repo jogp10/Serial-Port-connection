@@ -23,6 +23,8 @@ typedef struct
 // Maximum number of bytes that application layer should send to link layer
 #define MAX_PAYLOAD_SIZE 1000
 
+#define _POSIX_SOURCE 1 // POSIX compliant source
+
 // MISC
 #define FALSE 0
 #define TRUE 1
@@ -30,6 +32,10 @@ typedef struct
 // Open a connection using the "port" parameters defined in struct linkLayer.
 // Return "1" on success or "-1" on error.
 int llopen(LinkLayer connectionParameters);
+
+int llopen_tx(int fd, int nRetransmissions, int timeout);
+
+int llopen_rx(int fd);
 
 // Send data in buf with size bufSize.
 // Return number of chars written, or "-1" on error.
