@@ -49,7 +49,7 @@ enum STATE next_state(enum STATE state, unsigned char byte) {
             }
             break;
         case FLAG_RCV:
-            if (byte == A_SENDER) {
+            if (byte == A_SENDER || byte == A_RECEIVER) {
                 return A_RCV;
             }
             else if (byte == FLAG) {

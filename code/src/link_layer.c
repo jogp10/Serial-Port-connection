@@ -298,7 +298,7 @@ int llclose_rx(int fd){
     // Send DISC
     
     // Mount DISC
-    unsigned char _buf[BUF_SIZE + 1] = {FLAG, A_SENDER, DISC, A_SENDER ^ DISC, FLAG, '\0'};
+    unsigned char _buf[BUF_SIZE + 1] = {FLAG, A_RECEIVER, DISC, A_SENDER ^ DISC, FLAG, '\0'};
     // Set alarm
     (void)signal(SIGALRM, alarmHandler);
     alarmEnabled = FALSE;
