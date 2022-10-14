@@ -11,11 +11,11 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
                       int nTries, int timeout, const char *filename)
 {
     LinkLayer connectionParameters;
-    LinkLayerRole role = strcmp(role, "tx") == 0 ? LlTx  : (LlRx);
+    LinkLayerRole r = strcmp(role, "tx") == 0 ? LlTx  : (LlRx);
 
     // Construct connection parameters
     strcpy(connectionParameters.serialPort, serialPort);
-    connectionParameters.role = role;
+    connectionParameters.role = r;
     connectionParameters.baudRate = baudRate;
     connectionParameters.nRetransmissions = nTries;
     connectionParameters.timeout = timeout;
@@ -28,17 +28,17 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
 
     // Open file
 
-    FILE *file = fopen(filename, "r");
+    //FILE *file = fopen(filename, "r");
 
 
     // Send file
-    if (role == LlTx)
+    if (r == LlTx)
     {
         // TODO
         //llwrite(filename);
     }
     // Receive file
-    else if (role == LlRx)
+    else if (r == LlRx)
     {
         // TODO
         //llread(filename);
@@ -49,8 +49,8 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         exit(1);
     }
 
-    
     // Close serial port
+    printf("Disconnecting!\n");
     if (!llclose(0))
     {
         printf("Error closing serial port\n");

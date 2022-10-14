@@ -74,6 +74,9 @@ enum STATE next_state(enum STATE state, unsigned char byte) {
             if (byte == (A_SENDER ^ SET) || byte == (A_SENDER ^ UA) || byte == (A_SENDER ^ DISC) || byte == (A_SENDER ^ RR) || byte == (A_SENDER ^ REJ)) {
                 return BCC_OK;
             }
+            else if (byte == (A_RECEIVER ^ SET) || byte == (A_RECEIVER ^ UA) || byte == (A_RECEIVER ^ DISC) || byte == (A_RECEIVER ^ RR) || byte == (A_RECEIVER ^ REJ)) {
+                return BCC_OK;
+            }
             else if (byte == FLAG) {
                 return FLAG_RCV;
             }
