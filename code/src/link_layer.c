@@ -130,7 +130,7 @@ int llopen_tx(int fd, int nRetransmissions, int timeout)
             break;
         }
     }
-    return state == STOP;
+    return (state == STOP) ? 1 : -1;
 }
 
 
@@ -212,7 +212,7 @@ int llclose(int showStatistics)
     }
 
     // Restore the old port settings
-    if (!tcsetattr(fd, TCSANOW, &oldtio) )
+    if (tcsetattr(fd, TCSANOW, &oldtio) == -1)
     {
         perror("tcsetattr");
         exit(-1);
@@ -273,7 +273,7 @@ int llclose_tx(int fd) {
 
     printf("Sent UA\n");
 
-    return state == STOP;
+    return (state == STOP) ? 1 : -1;
 }
 
 
@@ -336,5 +336,5 @@ int llclose_rx(int fd){
     }
 
 
-    return state == STOP;
+    return (state == STOP) ? 1 : -1;
 }

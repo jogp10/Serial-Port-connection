@@ -46,11 +46,11 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
     else
     {
         printf("Invalid role: %s\n", role);
-        exit(1);
+        exit(-1);
     }
 
     // Close serial port
-    printf("Disconnecting!\n");
+    fprintf(stderr, "Disconnecting!\n");
     if (!llclose(0))
     {
         printf("Error closing serial port\n");
@@ -58,5 +58,5 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
     }
 
     printf("Application layer protocol finished\n");
-    exit(1);
+    exit(0);
 }
