@@ -8,6 +8,8 @@
 #define SET_SIZE    6
 #define UA_SIZE     6
 #define DISC_SIZE   6
+#define RR_SIZE     6
+#define REJ_SIZE    6
 
 #define A_SENDER    0x03 // 0000 0011
 #define A_RECEIVER  0x01 // 0000 0001
@@ -38,7 +40,7 @@ enum STATE {
     BCC_OK
 };
 
-enum STATE next_state(enum STATE state, unsigned char byte) {
+enum STATE next_state(enum STATE state, unsigned char byte, unsigned char control) {
     switch (state) {
         case START:
             if (byte == FLAG) {
@@ -49,7 +51,7 @@ enum STATE next_state(enum STATE state, unsigned char byte) {
             }
             break;
         case FLAG_RCV:
-            if (byte == A_SENDER || byte == A_RECEIVER) {
+            if (byte == control) {
                 return A_RCV;
             }
             else if (byte == FLAG) {
@@ -71,10 +73,7 @@ enum STATE next_state(enum STATE state, unsigned char byte) {
             }
             break;
         case C_RCV:
-            if (byte == (A_SENDER ^ SET) || byte == (A_SENDER ^ UA) || byte == (A_SENDER ^ DISC) || byte == (A_SENDER ^ RR) || byte == (A_SENDER ^ REJ)) {
-                return BCC_OK;
-            }
-            else if (byte == (A_RECEIVER ^ SET) || byte == (A_RECEIVER ^ UA) || byte == (A_RECEIVER ^ DISC) || byte == (A_RECEIVER ^ RR) || byte == (A_RECEIVER ^ REJ)) {
+            if (byte == (control ^ SET) || byte == (control ^ UA) || byte == (control ^ DISC) || byte == (control ^ RR) || byte == (control ^ REJ)) {
                 return BCC_OK;
             }
             else if (byte == FLAG) {

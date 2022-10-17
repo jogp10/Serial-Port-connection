@@ -3,7 +3,6 @@
 #include "link_layer.h"
 #include "state_machine.h"
 
-
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -65,7 +64,7 @@ int llopen(LinkLayer connectionParameters)
     newtio.c_oflag = 0;
     newtio.c_lflag = 0;
     newtio.c_cc[VTIME] = 0.1; // Inter-character timer unused
-    newtio.c_cc[VMIN] = 0;  // Read without blocking
+    newtio.c_cc[VMIN] = 0;    // Read without blocking
     tcflush(fd, TCIOFLUSH);
 
     if (tcsetattr(fd, TCSANOW, &newtio) == -1)
@@ -75,7 +74,7 @@ int llopen(LinkLayer connectionParameters)
 
     if (role == LlTx)
     {
-        if(!llopen_tx(fd, nRetries, timeout))
+        if (!llopen_tx())
         {
             printf("Error opening connection\n");
             return -1;
@@ -83,18 +82,17 @@ int llopen(LinkLayer connectionParameters)
     }
     else
     {
-        if(!llopen_rx(fd))
+        if (!llopen_rx())
         {
             printf("Error opening serial port");
             return -1;
         }
     }
-    
+
     return 1;
 }
 
-
-int llopen_tx(int fd, int nRetransmissions, int timeout)
+int llopen_tx()
 {
     // Mount SET
     (void)signal(SIGALRM, alarmHandler);
@@ -103,7 +101,7 @@ int llopen_tx(int fd, int nRetransmissions, int timeout)
 
     enum STATE state = START;
 
-    while (alarmCount < nRetransmissions && state != STOP)
+    while (alarmCount < nRetries && state != STOP)
     {
         if (alarmEnabled == FALSE)
         {
@@ -118,13 +116,15 @@ int llopen_tx(int fd, int nRetransmissions, int timeout)
 
         // Read from serial port
         int bytes;
-        if ((bytes = read(fd, buf, 1)) <= 0) {
-            if (bytes<0) exit(-1);
+        if ((bytes = read(fd, buf, 1)) <= 0)
+        {
+            if (bytes < 0)
+                exit(-1);
             continue;
         }
 
         // Process byte
-        if ((state = next_state(state, *buf)) == STOP)
+        if ((state = next_state(state, *buf, A_SENDER)) == STOP)
         {
             printf("UA received\n");
             break;
@@ -133,14 +133,13 @@ int llopen_tx(int fd, int nRetransmissions, int timeout)
     return (state == STOP) ? 1 : -1;
 }
 
+int llopen_rx()
+{
 
-int llopen_rx(int fd){
-
-     // Loop for input
+    // Loop for input
     unsigned char buf[BUF_SIZE + 1] = {0}; // +1: Save space for the final '\0' char
 
-
-    // Receive SET  
+    // Receive SET
     enum STATE state = START;
     while (1)
     {
@@ -148,7 +147,8 @@ int llopen_rx(int fd){
         read(fd, buf, 1);
 
         // Process byte
-        if ( (state = next_state(state, *buf)) == STOP) {
+        if ((state = next_state(state, *buf, A_SENDER)) == STOP)
+        {
             printf("SET received\n");
             break;
         }
@@ -173,6 +173,50 @@ int llopen_rx(int fd){
 int llwrite(const unsigned char *buf, int bufSize)
 {
     // TODO
+    unsigned char _buf[255];
+
+    while (bufSize > 0)
+    {
+        int bytes = 0;
+        enum STATE state = START;
+        while (alarmCount < nRetries && state != STOP)
+        {
+            if (alarmEnabled == FALSE)
+            {
+                bytes = write(fd, buf, bufSize);
+                if (bytes < 0)
+                {
+                    return -1;
+                }
+
+                printf("Sent %d bytes\n", bytes);
+
+                state = START;
+
+                alarm(timeout);
+                alarmEnabled = TRUE;
+            }
+
+            while (1)
+            {
+                // Returns after 1 chars have been input
+                read(fd, _buf, 1);
+
+                // Process byte
+                if ((state = next_state(state, _buf[0], A_SENDER)) == STOP)
+                {
+                    printf("RR received\n");
+                    break;
+                }
+            }
+        }
+
+        if (state == STOP)
+        {
+            buf += bytes;
+            bufSize -= bytes;
+        }
+    }
 
     return 0;
 }
@@ -183,6 +227,33 @@ int llwrite(const unsigned char *buf, int bufSize)
 int llread(unsigned char *packet)
 {
     // TODO
+
+    unsigned char buf[BUF_SIZE + 1] = {0}; // +1: Save space for the final '\0' char
+
+    // Receive packet
+    enum STATE state = START;
+    while (1)
+    {
+        // Returns after 1 chars have been input
+        read(fd, buf, 1);
+
+        // Process byte
+        if ((state = next_state(state, *buf, A_SENDER)) == STOP)
+        {
+            printf("Packet received\n");
+            break;
+        }
+    }
+
+    // Send RR
+    buf[0] = FLAG;
+    buf[1] = A_SENDER;
+    buf[2] = RR;
+    buf[3] = buf[1] ^ buf[2];
+    buf[4] = FLAG;
+
+    write(fd, buf, RR_SIZE);
+    fprintf(stderr, "RR written\n");
 
     return 0;
 }
@@ -196,7 +267,7 @@ int llclose(int showStatistics)
     // Close serial port
     if (role == LlTx)
     {
-        if (!llclose_tx(fd))
+        if (!llclose_tx())
         {
             printf("Error closing serial port\n");
             exit(-1);
@@ -204,7 +275,7 @@ int llclose(int showStatistics)
     }
     else
     {
-        if (!llclose_rx(fd))
+        if (!llclose_rx())
         {
             printf("Error closing serial port\n");
             exit(-1);
@@ -223,7 +294,8 @@ int llclose(int showStatistics)
     return 1;
 }
 
-int llclose_tx(int fd) {
+int llclose_tx()
+{
 
     // Mount DISC
     (void)signal(SIGALRM, alarmHandler);
@@ -249,11 +321,13 @@ int llclose_tx(int fd) {
         // Read from serial port
         // Returns after 1 chars have been input
         int bytes;
-        if ((bytes = read(fd, buf, 1)) <= 0) {
-            if (bytes<0) exit(-1);
+        if ((bytes = read(fd, buf, 1)) <= 0)
+        {
+            if (bytes < 0)
+                exit(-1);
             continue;
         }
-        if ((state = next_state(state, *buf)) == STOP)
+        if ((state = next_state(state, *buf, A_RECEIVER)) == STOP)
         {
             printf("DISC received\n");
         }
@@ -261,12 +335,13 @@ int llclose_tx(int fd) {
 
     // Send UA
     buf[0] = FLAG;
-    buf[1] = A_SENDER;
+    buf[1] = A_RECEIVER;
     buf[2] = UA;
     buf[3] = buf[1] ^ buf[2];
     buf[4] = FLAG;
 
-    if (!write(fd, buf, UA_SIZE)) {
+    if (!write(fd, buf, UA_SIZE))
+    {
         printf("Error sending UA\n");
         exit(-1);
     }
@@ -276,10 +351,9 @@ int llclose_tx(int fd) {
     return (state == STOP) ? 1 : -1;
 }
 
-
-int llclose_rx(int fd){
+int llclose_rx()
+{
     unsigned char buf[BUF_SIZE + 1] = {0};
-    
 
     // Receive DISC
     enum STATE state = START;
@@ -289,16 +363,17 @@ int llclose_rx(int fd){
         read(fd, buf, 1);
 
         // Process byte
-        if ( (state = next_state(state, *buf)) == STOP) {
+        if ((state = next_state(state, *buf, A_SENDER)) == STOP)
+        {
             printf("DISC received\n");
             break;
         }
     }
 
     // Send DISC
-    
+
     // Mount DISC
-    unsigned char _buf[BUF_SIZE + 1] = {FLAG, A_RECEIVER, DISC, A_SENDER ^ DISC, FLAG, '\0'};
+    unsigned char _buf[BUF_SIZE + 1] = {FLAG, A_RECEIVER, DISC, A_RECEIVER ^ DISC, FLAG, '\0'};
     // Set alarm
     (void)signal(SIGALRM, alarmHandler);
     alarmEnabled = FALSE;
@@ -306,7 +381,7 @@ int llclose_rx(int fd){
     state = START;
 
     while (alarmCount < nRetries && state != STOP)
-    {   
+    {
 
         if (alarmEnabled == FALSE)
         {
@@ -323,18 +398,19 @@ int llclose_rx(int fd){
         // Read from serial port
         // Returns after 1 chars have been input
         int bytes;
-        if ((bytes = read(fd, _buf, 1)) <= 0) {
-            if (bytes<0) exit(-1);
+        if ((bytes = read(fd, _buf, 1)) <= 0)
+        {
+            if (bytes < 0)
+                exit(-1);
             continue;
         }
-        
-        if ((state = next_state(state, *_buf)) == STOP)
+
+        if ((state = next_state(state, *_buf, A_RECEIVER)) == STOP)
         {
             printf("UA received\n");
             break;
         }
     }
-
 
     return (state == STOP) ? 1 : -1;
 }

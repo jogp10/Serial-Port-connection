@@ -34,9 +34,9 @@ typedef struct
 // Return "1" on success or "-1" on error.
 int llopen(LinkLayer connectionParameters);
 
-int llopen_tx(int fd, int nRetransmissions, int timeout);
+int llopen_tx();
 
-int llopen_rx(int fd);
+int llopen_rx();
 
 // Send data in buf with size bufSize.
 // Return number of chars written, or "-1" on error.
@@ -51,7 +51,7 @@ int llread(unsigned char *packet);
 // Return "1" on success or "-1" on error.
 int llclose(int showStatistics);
 
-int llclose_tx(int fd);
-int llclose_rx(int fd);
+int llclose_tx();
+int llclose_rx();
 
 #endif // _LINK_LAYER_H_

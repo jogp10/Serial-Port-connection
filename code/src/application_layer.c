@@ -26,28 +26,39 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         exit(-1);
     }
 
-    // Open file
+    FILE *file = fopen(filename, "r");
+    FILE *output = fopen("output.txt", "w");
 
-    //FILE *file = fopen(filename, "r");
-
-
+/*
     // Send file
     if (r == LlTx)
     {
-        // TODO
-        //llwrite(filename);
+        char buffer[255];
+        int size;
+
+        while ((size = fread(buffer, 1, 255, file)) > 0)
+        {
+            llwrite(buffer, size);
+        }
+
     }
     // Receive file
     else if (r == LlRx)
     {
-        // TODO
-        //llread(filename);
+        char buffer[255];
+        int size;
+
+        while ((size = llread(buffer)) > 0)
+        {
+            fwrite(buffer, 1, size, output);
+        }
     }
     else
     {
         printf("Invalid role: %s\n", role);
         exit(-1);
     }
+    */
 
     // Close serial port
     fprintf(stderr, "Disconnecting!\n");
