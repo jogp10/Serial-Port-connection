@@ -124,7 +124,7 @@ int llopen_tx()
         }
 
         // Process byte
-        if ((state = next_state(state, *buf, A_SENDER)) == STOP)
+        if ((state = next_state(state, *buf, A_SENDER, NULL)) == STOP)
         {
             printf("UA received\n");
             break;
@@ -147,7 +147,7 @@ int llopen_rx()
         read(fd, buf, 1);
 
         // Process byte
-        if ((state = next_state(state, *buf, A_SENDER)) == STOP)
+        if ((state = next_state(state, *buf, A_SENDER, NULL)) == STOP)
         {
             printf("SET received\n");
             break;
@@ -173,7 +173,7 @@ int llopen_rx()
 int llwrite(const unsigned char *buf, int bufSize)
 {
     // TODO
-    unsigned char _buf[255];
+    unsigned char _buf[BUF_SIZE + 1] = {0};
 
     while (bufSize > 0)
     {
@@ -183,7 +183,31 @@ int llwrite(const unsigned char *buf, int bufSize)
         {
             if (alarmEnabled == FALSE)
             {
-                bytes = write(fd, buf, bufSize);
+                // Build frame
+                _buf[0] = FLAG;
+                _buf[1] = A_SENDER;
+                _buf[2] = TI + Ns;
+                _buf[3] = _buf[1] ^ _buf[2];
+
+                // Copy data
+                int i;
+                for (i = 0; i < bufSize && i < 255 - 4; i++)
+                {
+                    _buf[4 + i] = buf[i];
+                }
+
+                // Calculate BCC2
+                unsigned char bcc2 = 0;
+                for (i = 0; i < bufSize; i++)
+                {
+                    bcc2 ^= buf[i];
+                }
+
+                _buf[4 + i] = bcc2;
+                _buf[5 + i] = FLAG;
+
+                // Write frame
+                bytes = write(fd, _buf, 6 + i);
                 if (bytes < 0)
                 {
                     return -1;
@@ -203,7 +227,7 @@ int llwrite(const unsigned char *buf, int bufSize)
                 read(fd, _buf, 1);
 
                 // Process byte
-                if ((state = next_state(state, _buf[0], A_SENDER)) == STOP)
+                if ((state = next_state(state, _buf[0], A_SENDER, Nr)) == STOP)
                 {
                     printf("RR received\n");
                     break;
@@ -215,6 +239,7 @@ int llwrite(const unsigned char *buf, int bufSize)
         {
             buf += bytes;
             bufSize -= bytes;
+            Ns != Ns;
         }
     }
 
@@ -238,7 +263,7 @@ int llread(unsigned char *packet)
         read(fd, buf, 1);
 
         // Process byte
-        if ((state = next_state(state, *buf, A_SENDER)) == STOP)
+        if ((state = next_state(state, *buf, A_SENDER, Ns)) == STOP)
         {
             printf("Packet received\n");
             break;
@@ -327,7 +352,7 @@ int llclose_tx()
                 exit(-1);
             continue;
         }
-        if ((state = next_state(state, *buf, A_RECEIVER)) == STOP)
+        if ((state = next_state(state, *buf, A_RECEIVER, NULL)) == STOP)
         {
             printf("DISC received\n");
         }
@@ -363,7 +388,7 @@ int llclose_rx()
         read(fd, buf, 1);
 
         // Process byte
-        if ((state = next_state(state, *buf, A_SENDER)) == STOP)
+        if ((state = next_state(state, *buf, A_SENDER, NULL)) == STOP)
         {
             printf("DISC received\n");
             break;
@@ -405,7 +430,7 @@ int llclose_rx()
             continue;
         }
 
-        if ((state = next_state(state, *_buf, A_RECEIVER)) == STOP)
+        if ((state = next_state(state, *_buf, A_RECEIVER, NULL)) == STOP)
         {
             printf("UA received\n");
             break;

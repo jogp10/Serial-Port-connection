@@ -19,7 +19,7 @@
 
 #define UA          0x07 // 0000 0111
 
-#define ACK         0x7f // 0111 1111
+#define TS_MASK         0x7f // 0111 1111
 
 #define RR          0x05 // 0000 0101
 #define RR0         0x05 // 0000 0101
@@ -27,6 +27,13 @@
 #define REJ         0x01 // 0000 0001
 #define REJ0        0x01 // 0000 0001
 #define REJ1        0x81 // 1000 0001
+
+#define TI_MASK    0xbf // 1011 1111
+
+#define TI         0x00 // 0000 0000
+#define TI0        0x00 // 0000 0000
+#define TI1        0x40 // 0100 0000
+
 
 #define MAX_SIZE    256
 
@@ -37,67 +44,12 @@ enum STATE {
     FLAG_RCV,
     A_RCV,
     C_RCV,
-    BCC_OK
+    C1_RCV,
+    BCC_OK,
+    BCC1_OK,
+    BCC2_OK
 };
 
-enum STATE next_state(enum STATE state, unsigned char byte, unsigned char control) {
-    switch (state) {
-        case START:
-            if (byte == FLAG) {
-                return FLAG_RCV;
-            }
-            else {
-                return START;
-            }
-            break;
-        case FLAG_RCV:
-            if (byte == control) {
-                return A_RCV;
-            }
-            else if (byte == FLAG) {
-                return FLAG_RCV;
-            }
-            else {
-                return START;
-            }
-            break;
-        case A_RCV:
-            if (byte == SET || byte == UA || byte == DISC || (byte && ACK == RR) || (byte && ACK == REJ)) {
-                return C_RCV;
-            }
-            else if (byte == FLAG) {
-                return FLAG_RCV;
-            }
-            else {
-                return START;
-            }
-            break;
-        case C_RCV:
-            if (byte == (control ^ SET) || byte == (control ^ UA) || byte == (control ^ DISC) || byte == (control ^ RR) || byte == (control ^ REJ)) {
-                return BCC_OK;
-            }
-            else if (byte == FLAG) {
-                return FLAG_RCV;
-            }
-            else {
-                return START;
-            }
-            break;
-        case BCC_OK:
-            if (byte == FLAG) {
-                return STOP;
-            }
-            else {
-                return START;
-            }
-            break;
-        case STOP:
-            return STOP;
-            break;
-        default:
-            return START;
-            break;
-    }
-}
+enum STATE next_state(enum STATE state, unsigned char byte, unsigned char control, unsigned char nControl);
 
 #endif // STATE_MACHINE_H
