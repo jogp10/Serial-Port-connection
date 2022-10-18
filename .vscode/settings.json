@@ -1,5 +1,7 @@
 {
     "files.associations": {
-        "stdlib.h": "c"
+        "stdlib.h": "c",
+        "alarm.h": "c",
+        "link_layer.h": "c"
     }
 }

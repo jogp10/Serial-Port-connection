@@ -3,6 +3,7 @@
 #include "link_layer.h"
 #include "state_machine.h"
 
+
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -18,8 +19,6 @@ struct termios oldtio;
 struct termios newtio;
 
 int fd;
-int alarmEnabled = FALSE;
-int alarmCount = 0;
 
 int Nr = 1;
 int Ns = 0;
@@ -29,12 +28,15 @@ int nRetries;
 int timeout;
 LinkLayerRole role;
 
+int alarmEnabled = FALSE;
+int alarmCount = 0;
+
 // Alarm function handler
 void alarmHandler(int signal)
 {
     alarmEnabled = FALSE;
     alarmCount++;
-    printf("Alarm #%d\n", alarmCount);
+    printf("Alarm #%d\n", alarmCount);    
 }
 
 ////////////////////////////////////////////////
@@ -42,6 +44,7 @@ void alarmHandler(int signal)
 ////////////////////////////////////////////////
 int llopen(LinkLayer connectionParameters)
 {
+
     // Set global variables
     serialPort = connectionParameters.serialPort;
     role = connectionParameters.role;
@@ -49,7 +52,7 @@ int llopen(LinkLayer connectionParameters)
     timeout = connectionParameters.timeout;
 
     // Open serial port
-    fd = open(serialPort, O_RDWR | O_NOCTTY | O_NONBLOCK);
+    fd = open(serialPort, O_RDWR | O_NOCTTY);
 
     if (fd < 0)
         return -1;
@@ -57,6 +60,7 @@ int llopen(LinkLayer connectionParameters)
     // Save current port settings
     if (tcgetattr(fd, &oldtio) == -1)
         return -1;
+
 
     memset(&newtio, 0, sizeof(newtio));
     newtio.c_cflag = connectionParameters.baudRate | CS8 | CLOCAL | CREAD;
@@ -70,14 +74,14 @@ int llopen(LinkLayer connectionParameters)
     if (tcsetattr(fd, TCSANOW, &newtio) == -1)
         return -1;
 
-    printf("New termios structure set\n");
+    fprintf(stderr, "New termios structure set\n");
 
     if (role == LlTx)
     {
         if (!llopen_tx())
         {
             printf("Error opening connection\n");
-            return -1;
+            exit(-1);
         }
     }
     else
@@ -85,7 +89,7 @@ int llopen(LinkLayer connectionParameters)
         if (!llopen_rx())
         {
             printf("Error opening serial port");
-            return -1;
+            exit(-1);
         }
     }
 
@@ -95,16 +99,18 @@ int llopen(LinkLayer connectionParameters)
 int llopen_tx()
 {
     // Mount SET
-    (void)signal(SIGALRM, alarmHandler);
-
+    
     unsigned char buf[BUF_SIZE + 1] = {FLAG, A_SENDER, SET, A_SENDER ^ SET, FLAG, '\0'};
 
+    
     enum STATE state = START;
 
     while (alarmCount < nRetries && state != STOP)
     {
         if (alarmEnabled == FALSE)
         {
+            (void)signal(SIGALRM, alarmHandler);
+            
             write(fd, buf, SET_SIZE);
             fprintf(stderr, "SET written\n");
 
@@ -239,7 +245,7 @@ int llwrite(const unsigned char *buf, int bufSize)
         {
             buf += bytes;
             bufSize -= bytes;
-            Ns != Ns;
+            Ns = !Ns;
         }
     }
 
@@ -334,6 +340,8 @@ int llclose_tx()
     {
         if (alarmEnabled == FALSE)
         {
+            (void)signal(SIGALRM, alarmHandler);
+
             write(fd, buf, DISC_SIZE);
             fprintf(stderr, "DISC written from tx\n");
 
@@ -400,7 +408,6 @@ int llclose_rx()
     // Mount DISC
     unsigned char _buf[BUF_SIZE + 1] = {FLAG, A_RECEIVER, DISC, A_RECEIVER ^ DISC, FLAG, '\0'};
     // Set alarm
-    (void)signal(SIGALRM, alarmHandler);
     alarmEnabled = FALSE;
     alarmCount = 0;
     state = START;
@@ -410,6 +417,7 @@ int llclose_rx()
 
         if (alarmEnabled == FALSE)
         {
+            (void)signal(SIGALRM, alarmHandler);
 
             write(fd, _buf, DISC_SIZE);
             fprintf(stderr, "DISC written from rx\n");
