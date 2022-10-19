@@ -3,7 +3,6 @@
 #include "link_layer.h"
 #include "state_machine.h"
 
-
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -36,7 +35,7 @@ void alarmHandler(int signal)
 {
     alarmEnabled = FALSE;
     alarmCount++;
-    printf("Alarm #%d\n", alarmCount);    
+    printf("Alarm #%d\n", alarmCount);
 }
 
 ////////////////////////////////////////////////
@@ -61,7 +60,6 @@ int llopen(LinkLayer connectionParameters)
     if (tcgetattr(fd, &oldtio) == -1)
         return -1;
 
-
     memset(&newtio, 0, sizeof(newtio));
     newtio.c_cflag = connectionParameters.baudRate | CS8 | CLOCAL | CREAD;
     newtio.c_iflag = IGNPAR;
@@ -73,8 +71,6 @@ int llopen(LinkLayer connectionParameters)
 
     if (tcsetattr(fd, TCSANOW, &newtio) == -1)
         return -1;
-
-    fprintf(stderr, "New termios structure set\n");
 
     if (role == LlTx)
     {
@@ -99,10 +95,9 @@ int llopen(LinkLayer connectionParameters)
 int llopen_tx()
 {
     // Mount SET
-    
+
     unsigned char buf[BUF_SIZE + 1] = {FLAG, A_SENDER, SET, A_SENDER ^ SET, FLAG, '\0'};
 
-    
     enum STATE state = START;
 
     while (alarmCount < nRetries && state != STOP)
@@ -110,7 +105,7 @@ int llopen_tx()
         if (alarmEnabled == FALSE)
         {
             (void)signal(SIGALRM, alarmHandler);
-            
+
             write(fd, buf, SET_SIZE);
             fprintf(stderr, "SET written\n");
 
@@ -179,77 +174,80 @@ int llopen_rx()
 int llwrite(const unsigned char *buf, int bufSize)
 {
     // TODO
-    unsigned char _buf[BUF_SIZE + 1] = {0};
+    unsigned char _buf[MAX_PAYLOAD_SIZE + 6];
 
-    while (bufSize > 0)
+    int bytes = 0;
+    alarmCount = 0;
+    enum STATE state = START;
+
+    // Build frame
+    // while (alarmCount < nRetries && state != STOP)
+    while (1)
     {
-        int bytes = 0;
-        enum STATE state = START;
-        while (alarmCount < nRetries && state != STOP)
+        if (alarmEnabled == FALSE)
         {
-            if (alarmEnabled == FALSE)
+            (void)signal(SIGALRM, alarmHandler);
+
+            // Build frame
+            _buf[0] = FLAG;
+            _buf[1] = A_SENDER;
+            _buf[2] = (Ns << 7);
+            _buf[3] = _buf[1] ^ _buf[2];
+
+            // Copy data
+            int i;
+            for (i = 0; i < bufSize; i++)
             {
-                // Build frame
-                _buf[0] = FLAG;
-                _buf[1] = A_SENDER;
-                _buf[2] = TI + Ns;
-                _buf[3] = _buf[1] ^ _buf[2];
-
-                // Copy data
-                int i;
-                for (i = 0; i < bufSize && i < 255 - 4; i++)
-                {
-                    _buf[4 + i] = buf[i];
-                }
-
-                // Calculate BCC2
-                unsigned char bcc2 = 0;
-                for (i = 0; i < bufSize; i++)
-                {
-                    bcc2 ^= buf[i];
-                }
-
-                _buf[4 + i] = bcc2;
-                _buf[5 + i] = FLAG;
-
-                // Write frame
-                bytes = write(fd, _buf, 6 + i);
-                if (bytes < 0)
-                {
-                    return -1;
-                }
-
-                printf("Sent %d bytes\n", bytes);
-
-                state = START;
-
-                alarm(timeout);
-                alarmEnabled = TRUE;
+                _buf[4 + i] = buf[i];
             }
 
-            while (1)
+            // Calculate BCC2
+            unsigned char bcc2 = 0;
+            for (i = 0; i < bufSize; i++)
             {
-                // Returns after 1 chars have been input
-                read(fd, _buf, 1);
-
-                // Process byte
-                if ((state = next_state(state, _buf[0], A_SENDER, Nr)) == STOP)
-                {
-                    printf("RR received\n");
-                    break;
-                }
+                bcc2 ^= buf[i];
             }
+
+            _buf[4 + i] = bcc2;
+            _buf[5 + i] = FLAG;
+
+            // Write frame
+            bytes = write(fd, _buf, 6 + i);
+            if (bytes < 0)
+            {
+                return -1;
+            }
+
+            printf("Sent %d bytes\n", bytes);
+
+            state = STOP; // test
+
+            alarm(timeout);
+            alarmEnabled = TRUE;
+            break; // test
         }
 
-        if (state == STOP)
+        break; // test
+        // Returns after 1 chars have been input
+        read(fd, _buf, 1);
+
+        // Process byte
+        if ((state = next_state(state, _buf[0], A_SENDER, Nr)) == STOP)
         {
-            buf += bytes;
-            bufSize -= bytes;
-            Ns = !Ns;
+            printf("RR received\n");
+            break;
         }
     }
 
-    return 0;
+    if (state == STOP)
+    {
+        Ns = (Ns + 1) % 2;
+        return bytes;
+    }
+    else
+    {
+        return -1;
+    }
 }
 
 ////////////////////////////////////////////////
@@ -329,7 +327,6 @@ int llclose_tx()
 {
 
     // Mount DISC
-    (void)signal(SIGALRM, alarmHandler);
     alarmEnabled = FALSE;
     alarmCount = 0;
 

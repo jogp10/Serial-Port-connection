@@ -13,7 +13,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
                       int nTries, int timeout, const char *filename)
 {
     LinkLayer connectionParameters;
-    LinkLayerRole r = strcmp(role, "tx") == 0 ? LlTx  : (LlRx);
+    LinkLayerRole r = strcmp(role, "tx") == 0 ? LlTx : (LlRx);
 
     // Construct connection parameters
     strcpy(connectionParameters.serialPort, serialPort);
@@ -25,7 +25,8 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
     printf("New termios structure set\n");
 
     // Open serial port
-    if (!llopen(connectionParameters)) {
+    if (!llopen(connectionParameters))
+    {
         printf("Error opening serial port");
         exit(-1);
     }
@@ -36,51 +37,60 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
     // Send file
     if (r == LlTx)
     {
-        printf("%d\n", get_file_size(file));
-        char buffer[BUF_SIZE - 1], control_packet[BUF_SIZE], data_packet[BUF_SIZE];
-        int size;
+        char buffer[MAX_PAYLOAD_SIZE], control_packet[MAX_PAYLOAD_SIZE];
 
         // Mount Start Control packet
-        mount_control_packet(control_packet, 2, get_file_size(file), filename);
+        int size = get_file_size(file);
+        printf("%d\n", size);
+        mount_control_packet(control_packet, 2, size, filename);
 
-        // llwrite(control_packet, 6 + l1 + strlen(filename));
+        printf("Sending START control packet\n");
+        llwrite(control_packet, 5 + nBytes_to_represent(size) + strlen(filename));
+
 
         // Send file
-        int n = 0;
-        while ((size = fread(buffer, 1, BUF_SIZE - 1, file)) > 0)
+        printf("Sending file...\n");
+        int n = 0, sz;
+        while ((sz = fread(buffer, 1, MAX_PAYLOAD_SIZE - 4, file)) > 0)
         {
             // Mount data packet
-            mount_data_packet(data_packet, buffer, size, n%255);
+            unsigned char data_packet[MAX_PAYLOAD_SIZE];
+            mount_data_packet(data_packet, buffer, sz, n);
             n++;
 
-            // llwrite(data_packet, size + 4);
+            llwrite(data_packet, sz + 4);
         }
 
         // Mount End Control packet
-        mount_control_packet(control_packet, 3, get_file_size(file), filename);
+        printf("Sending END control packet\n");
+        mount_control_packet(control_packet, 3, size, filename);
 
-        // llwrite(control_packet, 6 + l1 + strlen(filename));
+        llwrite(control_packet, 5 + nBytes_to_represent(sz) + strlen(filename));
     }
     else if (r == LlRx)
     {
-        char buffer[BUF_SIZE - 1], control_packet[BUF_SIZE], data_packet[BUF_SIZE];
+        /*
+        unsigned char buffer[BUF_SIZE - 1], control_packet[BUF_SIZE];
         int size;
 
         llread(control_packet);
 
+        unsigned char data_packet[BUF_SIZE];
+
         // Receive file
         while (llread(data_packet) > 0)
         {
+
             // Write to file
             fwrite(data_packet + 3, 1, data_packet[2], output);
         }
+        */
     }
     else
     {
         printf("Invalid role: %s\n", role);
         exit(-1);
     }
-    
 
     // Close serial port
     fprintf(stderr, "Disconnecting!\n");

@@ -39,8 +39,9 @@ int mount_control_packet(char *control_packet, int start, int file_size, char *f
 int mount_data_packet(char *data_packet, char *buffer, int size, int n) {
     data_packet[0] = 1; // DATA
     data_packet[1] = n; // N
-    data_packet[2] = size; // L2
-    strcpy(data_packet + 3, buffer); // V2
+    data_packet[2] = size/256; // L2
+    data_packet[3] = size%256; // L1
+    strcpy(data_packet + 4, buffer); // V2
 
     return 1;
 }
