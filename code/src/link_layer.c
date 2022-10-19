@@ -174,7 +174,7 @@ int llopen_rx()
 int llwrite(const unsigned char *buf, int bufSize)
 {
     // TODO
-    unsigned char _buf[MAX_PAYLOAD_SIZE + 6];
+    unsigned char _buf[2*MAX_PAYLOAD_SIZE];
 
     int bytes = 0;
     alarmCount = 0;
@@ -195,10 +195,17 @@ int llwrite(const unsigned char *buf, int bufSize)
             _buf[3] = _buf[1] ^ _buf[2];
 
             // Copy data
-            int i;
+            int i, j = 0;
             for (i = 0; i < bufSize; i++)
             {
-                _buf[4 + i] = buf[i];
+                // byte stuffing
+                if (buf[i] == FLAG || buf[i] == ESCAPE) {
+                    _buf[4 + i + j] = ESCAPE;
+                    _buf[4 + i + j + 1] = 0x5f & buf[i];
+                    j++;
+                } else {
+                    _buf[4 + i + j] = buf[i];
+                }
             }
 
             // Calculate BCC2
@@ -208,11 +215,11 @@ int llwrite(const unsigned char *buf, int bufSize)
                 bcc2 ^= buf[i];
             }
 
-            _buf[4 + i] = bcc2;
-            _buf[5 + i] = FLAG;
+            _buf[4 + i + j] = bcc2;
+            _buf[5 + i + j] = FLAG;
 
             // Write frame
-            bytes = write(fd, _buf, 6 + i);
+            bytes = write(fd, _buf, 6 + i + j);
             if (bytes < 0)
             {
                 return -1;
