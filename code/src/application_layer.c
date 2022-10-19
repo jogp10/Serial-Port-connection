@@ -32,7 +32,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
     }
 
     FILE *file = fopen(filename, "r");
-    FILE *output = fopen("output.txt", "w");
+    FILE *output = fopen("penguing-received.gif", "w");
 
     // Send file
     if (r == LlTx)
@@ -54,6 +54,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         while ((sz = fread(buffer, 1, MAX_PAYLOAD_SIZE - 4, file)) > 0)
         {
             // Mount data packet
+            printf("Sending data packet #%d\n", n);
             unsigned char data_packet[MAX_PAYLOAD_SIZE];
             mount_data_packet(data_packet, buffer, sz, n);
             n++;

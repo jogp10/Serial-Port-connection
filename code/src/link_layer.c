@@ -178,6 +178,7 @@ int llwrite(const unsigned char *buf, int bufSize)
 
     int bytes = 0;
     alarmCount = 0;
+    alarmEnabled = FALSE;
     enum STATE state = START;
 
     // Build frame
@@ -219,6 +220,7 @@ int llwrite(const unsigned char *buf, int bufSize)
             _buf[5 + i + j] = FLAG;
 
             // Write frame
+            printf("Writing frame...\n");
             bytes = write(fd, _buf, 6 + i + j);
             if (bytes < 0)
             {
