@@ -39,17 +39,17 @@
 
 
 enum STATE {
-    START,
-    STOP,
-    FLAG_RCV,
-    A_RCV,
-    C_RCV,
-    C1_RCV,
-    BCC_OK,
-    BCC1_OK,
-    BCC2_OK
+    START,      // 0
+    STOP,       // 1
+    FLAG_RCV,   // 2
+    A_RCV,      // 3
+    C_RCV,      // 4
+    C1_RCV,     // 5
+    BCC_OK,     // 6
+    BCC1_OK,    // 7
+    BCC2_OK     // 8
 };
 
-enum STATE next_state(enum STATE state, unsigned char byte, unsigned char control, unsigned char nControl);
+enum STATE next_state(enum STATE state, unsigned char byte, unsigned char control, unsigned char command, int nControl);
 
 #endif // STATE_MACHINE_H

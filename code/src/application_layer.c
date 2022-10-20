@@ -37,7 +37,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
     // Send file
     if (r == LlTx)
     {
-        char buffer[MAX_PAYLOAD_SIZE], control_packet[MAX_PAYLOAD_SIZE];
+        char buffer[MAX_PAYLOAD_SIZE + 1], control_packet[MAX_PAYLOAD_SIZE + 1];
 
         // Mount Start Control packet
         int size = get_file_size(file);
