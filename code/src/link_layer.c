@@ -193,7 +193,7 @@ int llwrite(const unsigned char *buf, int bufSize)
     int i = 0;
     while (alarmCount < nRetries && state != STOP)
     {
-        if (alarmEnabled == FALSE)
+        if (alarmEnabled == FALSE || state == REJECTED)
         {
             (void)signal(SIGALRM, alarmHandler);
 

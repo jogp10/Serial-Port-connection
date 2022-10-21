@@ -36,6 +36,9 @@ enum STATE next_state(enum STATE state, unsigned char byte, unsigned char contro
         {
             return C_RCV;
         }
+        else if (byte == (REJ << (command >> 7))) {
+            return REJECTED;
+        }
         else if (byte == FLAG)
         {
             return FLAG_RCV;
