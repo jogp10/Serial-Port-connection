@@ -3,11 +3,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-enum STATE next_state(enum STATE state, unsigned char byte, unsigned char control, unsigned char command, int nControl)
+enum STATE next_state(enum STATE state, unsigned char byte, unsigned char control, unsigned char command)
 {
-    if (&nControl == NULL)
-        nControl = -1;
-
     switch (state)
     {
     case START:
@@ -35,13 +32,9 @@ enum STATE next_state(enum STATE state, unsigned char byte, unsigned char contro
         }
         break;
     case A_RCV:
-        if (byte == command && nControl == -1)
+        if (byte == command)
         {
             return C_RCV;
-        }
-        else if (byte == command)
-        {
-            return C1_RCV;
         }
         else if (byte == FLAG)
         {
@@ -66,48 +59,13 @@ enum STATE next_state(enum STATE state, unsigned char byte, unsigned char contro
             return START;
         }
         break;
-    case C1_RCV:
-        if (byte == (control ^ command))
-        {
-            return BCC1_OK;
-        }
-        else if (byte == FLAG)
-        {
-            return FLAG_RCV;
-        }
-        else
-        {
-            return START;
-        }
-        break;
     case BCC_OK:
         if (byte == FLAG)
         {
             return STOP;
         }
-        else
-        {
-            return START;
-        }
-        break;
-    case BCC1_OK:
-        if (byte)
-        { // TODO
-            return BCC2_OK;
-        }
-        else
-        {
-            return START;
-        }
-        break;
-    case BCC2_OK:
-        if (byte == FLAG)
-        {
-            return STOP;
-        }
-        else
-        {
-            return START;
+        else {
+            return BCC_OK;
         }
         break;
     case STOP:

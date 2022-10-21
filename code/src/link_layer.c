@@ -125,7 +125,7 @@ int llopen_tx()
         }
 
         // Process byte
-        if ((state = next_state(state, *buf, A_SENDER, UA, -1)) == STOP)
+        if ((state = next_state(state, *buf, A_SENDER, UA)) == STOP)
         {
             printf("UA received\n");
             break;
@@ -138,7 +138,7 @@ int llopen_rx()
 {
 
     // Loop for input
-    unsigned char buf[BUF_SIZE + 1] = {0}; // +1: Save space for the final '\0' char
+    unsigned char buf[BUF_SIZE + 1]; // +1: Save space for the final '\0' char
 
     // Receive SET
     enum STATE state = START;
@@ -152,7 +152,7 @@ int llopen_rx()
         if(state!=0)printf("%d and byte received: %d\n", state, bytes);
 
         // Process byte
-        if ((state = next_state(state, *buf, A_SENDER, SET, -1)) == STOP)
+        if ((state = next_state(state, *buf, A_SENDER, SET)) == STOP)
         {
             printf("SET received\n");
             break;
@@ -187,8 +187,8 @@ int llwrite(const unsigned char *buf, int bufSize)
     enum STATE state = START;
 
     // Build frame
-    // while (alarmCount < nRetries && state != STOP)
-    while (1)
+    int i=0;
+    while (alarmCount < nRetries && state != STOP)
     {
         if (alarmEnabled == FALSE)
         {
@@ -231,30 +231,32 @@ int llwrite(const unsigned char *buf, int bufSize)
                 return -1;
             }
 
-            printf("Sent %d bytes\n", bytes);
+            printf("\nSent %d bytes\n", bytes);
 
-            state = STOP; // test
+            state = START;
 
             alarm(timeout);
             alarmEnabled = TRUE;
-            break; // test
         }
 
-        break; // test
         // Returns after 1 chars have been input
         read(fd, _buf, 1);
-
+        
         // Process byte
-        if ((state = next_state(state, _buf[0], A_SENDER, (RR & (Nr << 8)), Nr)) == STOP)
+        state = next_state(state, *_buf, A_SENDER, (RR | (Nr << 7)));
+        if (state == STOP)
         {
             printf("RR received\n");
             break;
         }
+        //printf("\\%x : %d/", *_buf, state);
+        i++;
     }
 
     if (state == STOP)
     {
         Ns = (Ns + 1) % 2;
+        Nr = (Nr + 1) % 2;
         return bytes;
     }
     else
@@ -266,38 +268,94 @@ int llwrite(const unsigned char *buf, int bufSize)
 ////////////////////////////////////////////////
 // LLREAD
 ////////////////////////////////////////////////
+
 int llread(unsigned char *packet)
 {
     // TODO
+    printf("Receiving packet\n");
+    static int b = 0;
+    
 
-    unsigned char buf[BUF_SIZE + 1] = {0}; // +1: Save space for the final '\0' char
+
+    unsigned char buf[BUF_SIZE + 1]; // +1: Save space for the final '\0' char
 
     // Receive packet
     enum STATE state = START;
     while (1)
     {
         // Returns after 1 chars have been input
-        read(fd, buf, 1);
+        if(read(fd, buf, 1)==0) continue;
 
         // Process byte
-        if ((state = next_state(state, *buf, A_SENDER, NULL, Ns)) == STOP) // TODO
+        state = next_state(state, *buf, A_SENDER, Ns << 7);
+        if (state == BCC_OK) // TODO
         {
-            printf("Packet received\n");
+            printf("\nHeader ok\n");
             break;
         }
+        
     }
+
+
+    // Read data
+    unsigned char bcc2 = 0;
+    int i = 0;
+    while (state != STOP)
+    {
+        // Returns after 1 chars have been input
+        if (read(fd, buf, 1)==0) continue;
+
+        if (*buf == FLAG) {
+            printf("FLAG RCV\n");
+            if (bcc2 != 0) {
+                printf("BCC2 not ok\n");
+                exit(-1);
+            }
+            state = STOP;
+            i--;
+            *(packet + i) = '\0';
+            break;
+        }
+        
+        if (*buf == ESCAPE)
+        {
+            // byte destuffing
+            read(fd, buf, 1); // read next byte
+            if (*buf == 0x5e)
+            {
+                *buf = FLAG;
+            }
+            else if (*buf == 0x5d)
+            {
+                *buf = ESCAPE;
+            }
+            
+        }
+        
+        // Copy data
+        *(packet + i) = *buf;
+        i++;
+        bcc2 ^= *buf;
+    }
+
+    
 
     // Send RR
     buf[0] = FLAG;
     buf[1] = A_SENDER;
-    buf[2] = RR;
+    buf[2] = RR | (Nr << 7);
     buf[3] = buf[1] ^ buf[2];
     buf[4] = FLAG;
 
-    write(fd, buf, RR_SIZE);
-    fprintf(stderr, "RR written\n");
 
-    return 0;
+    int bytes = write(fd, buf, RR_SIZE);
+    printf("\nWrote RR with bytes:%d\n", bytes);
+    printf("Nr: %x\n", (RR | (Nr << 7)));
+
+    Nr = (Nr + 1) % 2;
+    Ns = (Ns + 1) % 2;
+
+    return i;
 }
 
 ////////////////////////////////////////////////
@@ -370,7 +428,7 @@ int llclose_tx()
                 exit(-1);
             continue;
         }
-        if ((state = next_state(state, *buf, A_RECEIVER, DISC, -1)) == STOP)
+        if ((state = next_state(state, *buf, A_RECEIVER, DISC)) == STOP)
         {
             printf("DISC received\n");
         }
@@ -406,7 +464,7 @@ int llclose_rx()
         read(fd, buf, 1);
 
         // Process byte
-        if ((state = next_state(state, *buf, A_SENDER, DISC, -1)) == STOP)
+        if ((state = next_state(state, *buf, A_SENDER, DISC)) == STOP)
         {
             printf("DISC received\n");
             break;
@@ -448,7 +506,7 @@ int llclose_rx()
             continue;
         }
 
-        if ((state = next_state(state, *_buf, A_RECEIVER, UA, -1)) == STOP)
+        if ((state = next_state(state, *_buf, A_RECEIVER, UA)) == STOP)
         {
             printf("UA received\n");
             break;

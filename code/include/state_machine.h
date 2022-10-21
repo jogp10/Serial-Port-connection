@@ -50,6 +50,6 @@ enum STATE {
     BCC2_OK     // 8
 };
 
-enum STATE next_state(enum STATE state, unsigned char byte, unsigned char control, unsigned char command, int nControl);
+enum STATE next_state(enum STATE state, unsigned char byte, unsigned char control, unsigned char command);
 
 #endif // STATE_MACHINE_H
