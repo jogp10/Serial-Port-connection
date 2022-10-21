@@ -37,7 +37,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
     // Send file
     if (r == LlTx)
     {
-        char buffer[MAX_PAYLOAD_SIZE + 1], control_packet[MAX_PAYLOAD_SIZE + 1];
+        unsigned char buffer[MAX_PAYLOAD_SIZE + 1], control_packet[MAX_PAYLOAD_SIZE + 1];
 
         // Mount Start Control packet
         int size = get_file_size(file);
@@ -52,17 +52,17 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         int n = 0, sz;
         while ((sz = fread(buffer, 1, MAX_PAYLOAD_SIZE - 4, file)) > 0)
         {
+            printf("Packet read from file #%d\n", n);
+            for (int i = 0; i < sizeof(buffer); i++)
+            {
+                printf("\\%02x", buffer[i]);
+            }
+            printf("\n");
+
             // Mount data packet
             unsigned char data_packet[MAX_PAYLOAD_SIZE];
             mount_data_packet(data_packet, buffer, sizeof(buffer), n);
             n++;
-
-            printf("Sending data packet #%d\n", n);
-            for (int i = 0; i < sizeof(data_packet); i++)
-            {
-                printf("\\%02x ", data_packet[i]);
-            }
-            printf("\n");
 
             llwrite(data_packet, sz + 4);
         }
@@ -75,7 +75,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
     }
     else if (r == LlRx)
     {
-        unsigned char buffer[BUF_SIZE - 1], control_packet[MAX_PAYLOAD_SIZE];
+        unsigned char control_packet[MAX_PAYLOAD_SIZE];
         int size;
 
         printf("Receiving START packet...\n");
@@ -88,23 +88,22 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         int bytes;
         while ((bytes = llread(data_packet)) > 0)
         {
+            unsigned char buffer[BUF_SIZE - 1];
+
             if (data_packet[0] == 3)
                 break;
+            
             printf("Read %d bytes\n", bytes);
 
-            printf("data packet n: %d\n", data_packet[1]);
-            for (int i = 0; i < sizeof(data_packet); i++)
-            {
-                printf("\\%02x ", data_packet[i]);
-            }
-
+            printf("Packet read from file #%d\n", data_packet[1]);
             for (int i = 4; i < sizeof(data_packet); i++)
             {
-                printf("\\%02x ", data_packet[i]);
+                printf("0x%02X, ", data_packet[i]);
             }
+            printf("\n");
 
             // Write to file
-            fwrite(data_packet + 4, 1, sizeof(data_packet) - 4, output);
+            fwrite(data_packet + 4, 1, bytes - 4, output);
         }
         printf("Got out of loop\n");
     }

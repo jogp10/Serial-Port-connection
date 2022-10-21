@@ -249,7 +249,6 @@ int llwrite(const unsigned char *buf, int bufSize)
             printf("RR received\n");
             break;
         }
-        //printf("\\%x : %d/", *_buf, state);
         i++;
     }
 
