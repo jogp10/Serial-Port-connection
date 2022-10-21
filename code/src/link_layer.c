@@ -30,6 +30,8 @@ LinkLayerRole role;
 int alarmEnabled = FALSE;
 int alarmCount = 0;
 
+int sequence_n;
+
 // Alarm function handler
 void alarmHandler(int signal)
 {
@@ -54,11 +56,11 @@ int llopen(LinkLayer connectionParameters)
     fd = open(serialPort, O_RDWR | O_NOCTTY);
 
     if (fd < 0)
-        return -1;
+        exit(-1);
 
     // Save current port settings
     if (tcgetattr(fd, &oldtio) == -1)
-        return -1;
+        exit(-1);
 
     memset(&newtio, 0, sizeof(newtio));
     newtio.c_cflag = connectionParameters.baudRate | CS8 | CLOCAL | CREAD;
@@ -70,7 +72,7 @@ int llopen(LinkLayer connectionParameters)
     tcflush(fd, TCIOFLUSH);
 
     if (tcsetattr(fd, TCSANOW, &newtio) == -1)
-        return -1;
+        exit(-1);
 
     if (role == LlTx)
     {
@@ -147,9 +149,11 @@ int llopen_rx()
     {
         int bytes;
         // Returns after 1 chars have been input
-        if ((bytes = read(fd, buf, 1)) == 0) continue;
-        
-        if(state!=0)printf("%d and byte received: %d\n", state, bytes);
+        if ((bytes = read(fd, buf, 1)) == 0)
+            continue;
+
+        if (state != 0)
+            printf("%d and byte received: %d\n", state, bytes);
 
         // Process byte
         if ((state = next_state(state, *buf, A_SENDER, SET)) == STOP)
@@ -178,8 +182,7 @@ int llopen_rx()
 ////////////////////////////////////////////////
 int llwrite(const unsigned char *buf, int bufSize)
 {
-    // TODO
-    unsigned char _buf[2*MAX_PAYLOAD_SIZE];
+    unsigned char _buf[2 * MAX_PAYLOAD_SIZE];
 
     int bytes = 0;
     alarmCount = 0;
@@ -187,7 +190,7 @@ int llwrite(const unsigned char *buf, int bufSize)
     enum STATE state = START;
 
     // Build frame
-    int i=0;
+    int i = 0;
     while (alarmCount < nRetries && state != STOP)
     {
         if (alarmEnabled == FALSE)
@@ -205,11 +208,14 @@ int llwrite(const unsigned char *buf, int bufSize)
             for (i = 0; i < bufSize; i++)
             {
                 // byte stuffing
-                if (buf[i] == FLAG || buf[i] == ESCAPE) {
+                if (buf[i] == FLAG || buf[i] == ESCAPE)
+                {
                     _buf[4 + i + j] = ESCAPE;
                     _buf[4 + i + j + 1] = 0x5f & buf[i];
                     j++;
-                } else {
+                }
+                else
+                {
                     _buf[4 + i + j] = buf[i];
                 }
             }
@@ -221,15 +227,23 @@ int llwrite(const unsigned char *buf, int bufSize)
                 bcc2 ^= buf[i];
             }
 
-            _buf[4 + i + j] = bcc2;
+            if (bcc2 == FLAG || bcc2 == ESCAPE)
+            {
+                _buf[4 + i + j] = ESCAPE;
+                _buf[4 + i + j + 1] = 0x5f & bcc2;
+                j++;
+            }
+            else
+            {
+                _buf[4 + i + j] = bcc2;
+            }
+
             _buf[5 + i + j] = FLAG;
 
             // Write frame
             bytes = write(fd, _buf, 6 + i + j);
             if (bytes < 0)
-            {
-                return -1;
-            }
+                exit(-1);
 
             printf("\nSent %d bytes\n", bytes);
 
@@ -241,7 +255,7 @@ int llwrite(const unsigned char *buf, int bufSize)
 
         // Returns after 1 chars have been input
         read(fd, _buf, 1);
-        
+
         // Process byte
         state = next_state(state, *_buf, A_SENDER, (RR | (Nr << 7)));
         if (state == STOP)
@@ -254,8 +268,8 @@ int llwrite(const unsigned char *buf, int bufSize)
 
     if (state == STOP)
     {
+        Nr = Ns;
         Ns = (Ns + 1) % 2;
-        Nr = (Nr + 1) % 2;
         return bytes;
     }
     else
@@ -270,52 +284,71 @@ int llwrite(const unsigned char *buf, int bufSize)
 
 int llread(unsigned char *packet)
 {
-    // TODO
-    printf("Receiving packet\n");
-    static int b = 0;
-    
-
-
     unsigned char buf[BUF_SIZE + 1]; // +1: Save space for the final '\0' char
 
     // Receive packet
     enum STATE state = START;
-    while (1)
+    while (state != BCC_OK)
     {
         // Returns after 1 chars have been input
-        if(read(fd, buf, 1)==0) continue;
+        if (read(fd, buf, 1) == 0)
+            continue;
 
         // Process byte
-        state = next_state(state, *buf, A_SENDER, Ns << 7);
-        if (state == BCC_OK) // TODO
+        if (state == A_RCV && (*buf == (0 << 7) || (*buf == (1 << 7))))
         {
-            printf("\nHeader ok\n");
-            break;
+            Ns = (*buf >> 7);
+            Nr = (Ns + 1) % 2;
         }
-        
-    }
 
+        state = next_state(state, *buf, A_SENDER, Ns << 7);
+        if (state == IGNORE)
+            return 0;
+    }
 
     // Read data
     unsigned char bcc2 = 0;
-    int i = 0;
+    int i = 0, data = 0;
     while (state != STOP)
     {
         // Returns after 1 chars have been input
-        if (read(fd, buf, 1)==0) continue;
+        if (read(fd, buf, 1) == 0)
+            continue;
 
-        if (*buf == FLAG) {
+        // If data packet
+        if (i == 0)
+            data = (*buf == 2);
+
+        // Record sequence number
+        if (i == 1 && data)
+        {
+            if (sequence_n != *buf)
+            {
+                sequence_n = *buf;
+            }
+            else
+            {
+                state = IGNORE;
+                printf("Repeated packet\n");
+                break;
+            }
+        }
+
+        if (*buf == FLAG)
+        {
             printf("FLAG RCV\n");
-            if (bcc2 != 0) {
+            if (bcc2 != 0)
+            {
                 printf("BCC2 not ok\n");
-                exit(-1);
+                state = REJECTED;
+                break;
             }
             state = STOP;
             i--;
             *(packet + i) = '\0';
             break;
         }
-        
+
         if (*buf == ESCAPE)
         {
             // byte destuffing
@@ -328,31 +361,26 @@ int llread(unsigned char *packet)
             {
                 *buf = ESCAPE;
             }
-            
         }
-        
+
         // Copy data
         *(packet + i) = *buf;
         i++;
         bcc2 ^= *buf;
     }
 
-    
-
-    // Send RR
+    // Send RR or REJ
     buf[0] = FLAG;
     buf[1] = A_SENDER;
-    buf[2] = RR | (Nr << 7);
+    buf[2] = (state != REJECTED ? RR : REJ) | (Nr << 7);
     buf[3] = buf[1] ^ buf[2];
     buf[4] = FLAG;
 
-
     int bytes = write(fd, buf, RR_SIZE);
     printf("\nWrote RR with bytes:%d\n", bytes);
-    printf("Nr: %x\n", (RR | (Nr << 7)));
 
-    Nr = (Nr + 1) % 2;
-    Ns = (Ns + 1) % 2;
+    if (state == REJECTED || state == IGNORE)
+        return 0;
 
     return i;
 }

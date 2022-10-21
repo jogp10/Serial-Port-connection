@@ -22,14 +22,14 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
     connectionParameters.nRetransmissions = nTries;
     connectionParameters.timeout = timeout;
 
-    printf("New termios structure set\n");
-
     // Open serial port
     if (!llopen(connectionParameters))
     {
         printf("Error opening serial port");
         exit(-1);
     }
+
+    printf("New termios structure set\n");
 
     FILE *file = fopen(filename, "r");
     FILE *output = fopen("penguin-received.gif", "w");
@@ -41,23 +41,16 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
 
         // Mount Start Control packet
         int size = get_file_size(file);
-        printf("%d\n", size);
         mount_control_packet(control_packet, 2, size, filename);
 
         printf("Sending START control packet\n");
         llwrite(control_packet, 5 + nBytes_to_represent(size) + strlen(filename));
 
-        // Send file
         printf("Sending file...\n");
         int n = 0, sz;
         while ((sz = fread(buffer, 1, MAX_PAYLOAD_SIZE - 4, file)) > 0)
         {
             printf("Packet read from file #%d\n", n);
-            for (int i = 0; i < sizeof(buffer); i++)
-            {
-                printf("\\%02x", buffer[i]);
-            }
-            printf("\n");
 
             // Mount data packet
             unsigned char data_packet[MAX_PAYLOAD_SIZE];
@@ -67,7 +60,6 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
             llwrite(data_packet, sz + 4);
         }
 
-        // Mount End Control packet
         printf("Sending END control packet\n");
         mount_control_packet(control_packet, 3, size, filename);
 
@@ -75,37 +67,25 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
     }
     else if (r == LlRx)
     {
-        unsigned char control_packet[MAX_PAYLOAD_SIZE];
+        unsigned char control_packet[MAX_PAYLOAD_SIZE], data_packet[MAX_PAYLOAD_SIZE];
         int size;
 
         printf("Receiving START packet...\n");
         llread(control_packet);
 
-        unsigned char data_packet[MAX_PAYLOAD_SIZE];
-
-        // Receive file
         printf("Receiving file...\n");
         int bytes;
-        while ((bytes = llread(data_packet)) > 0)
+        while ((bytes = llread(data_packet)) >= 0)
         {
+            if (bytes == 0) continue;
+            
             unsigned char buffer[BUF_SIZE - 1];
 
             if (data_packet[0] == 3)
                 break;
-            
-            printf("Read %d bytes\n", bytes);
 
-            printf("Packet read from file #%d\n", data_packet[1]);
-            for (int i = 4; i < sizeof(data_packet); i++)
-            {
-                printf("0x%02X, ", data_packet[i]);
-            }
-            printf("\n");
-
-            // Write to file
             fwrite(data_packet + 4, 1, bytes - 4, output);
         }
-        printf("Got out of loop\n");
     }
     else
     {
@@ -113,8 +93,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         exit(-1);
     }
 
-    // Close serial port
-    fprintf(stderr, "Disconnecting!\n");
+    printf("Disconnecting!\n");
     if (!llclose(0))
     {
         printf("Error closing serial port\n");

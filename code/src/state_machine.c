@@ -28,7 +28,7 @@ enum STATE next_state(enum STATE state, unsigned char byte, unsigned char contro
         }
         else
         {
-            return START;
+            return IGNORE;
         }
         break;
     case A_RCV:
@@ -42,7 +42,7 @@ enum STATE next_state(enum STATE state, unsigned char byte, unsigned char contro
         }
         else
         {
-            return START;
+            return IGNORE;
         }
         break;
     case C_RCV:
@@ -56,7 +56,7 @@ enum STATE next_state(enum STATE state, unsigned char byte, unsigned char contro
         }
         else
         {
-            return START;
+            return IGNORE;
         }
         break;
     case BCC_OK:
@@ -64,8 +64,9 @@ enum STATE next_state(enum STATE state, unsigned char byte, unsigned char contro
         {
             return STOP;
         }
-        else {
-            return BCC_OK;
+        else
+        {
+            return IGNORE;
         }
         break;
     case STOP:
