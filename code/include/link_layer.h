@@ -35,7 +35,6 @@ typedef struct
 int llopen(LinkLayer connectionParameters);
 
 int llopen_tx();
-
 int llopen_rx();
 
 // Send data in buf with size bufSize.

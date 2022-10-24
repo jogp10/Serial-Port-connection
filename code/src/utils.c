@@ -22,14 +22,14 @@ int nBytes_to_represent(int n)
     return i;
 }
 
-int mount_control_packet(char *control_packet, int start, int file_size, char *filename)
+int mount_control_packet(unsigned char *control_packet, int start, int file_size, const char *filename)
 {
     control_packet[0] = start; // START
     // FILE SIZE
     control_packet[1] = 0; // T1
     int l1 = nBytes_to_represent(file_size);
     control_packet[2] = l1;                      // L1
-    strncpy(control_packet + 3, &file_size, l1); // V1
+    strncpy(control_packet + 3, (const char *) &file_size, l1); // V1
 
     // FILE NAME
     control_packet[4 + (l1 - 1)] = 1;                                   // T2
@@ -39,7 +39,7 @@ int mount_control_packet(char *control_packet, int start, int file_size, char *f
     return 1;
 }
 
-int mount_data_packet(char *data_packet, char *buffer, int size, int n)
+int mount_data_packet(unsigned char *data_packet, unsigned char *buffer, int size, int n)
 {
     data_packet[0] = 1;                    // DATA
     data_packet[1] = n;                    // N

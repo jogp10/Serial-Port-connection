@@ -30,7 +30,7 @@ LinkLayerRole role;
 int alarmEnabled = FALSE;
 int alarmCount = 0;
 
-int sequence_n;
+unsigned char sequence_n = 0xff;
 
 // Alarm function handler
 void alarmHandler(int signal)
@@ -195,6 +195,8 @@ int llwrite(const unsigned char *buf, int bufSize)
     {
         if (alarmEnabled == FALSE || state == REJECTED)
         {
+            if (state == REJECTED)
+                alarmCount++;
             (void)signal(SIGALRM, alarmHandler);
 
             // Build frame
@@ -245,15 +247,6 @@ int llwrite(const unsigned char *buf, int bufSize)
             if (bytes < 0)
                 exit(-1);
 
-            printf("Sent %d bytes\n", bytes);
-            printf("before buffing:\n");
-            for (int w = 0; w < 6 + i + j; w++)
-                printf("%02x ", _buf[w]);
-            printf("after buffing:\n");
-            for (int w = 0; w < bufSize; w++)
-                printf("%02x ", buf[w]);
-
-            printf("\n");
             state = START;
 
             alarm(timeout);
@@ -318,31 +311,31 @@ int llread(unsigned char *packet)
     // Read data
     unsigned char bcc2 = 0;
     int i = 0, data = 0;
-    while (state != STOP)
+    while (state != STOP) 
     {
+        if (state == IGNORE || state == REJECTED) break;
+        
         // Returns after 1 chars have been input
         if (read(fd, buf, 1) == 0)
             continue;
-        /*
-                // If data packet
-                if (i == 0)
-                    data = (*buf == 1);
 
-                // Record sequence number
-                if (i == 1 && data)
-                {
-                    if (sequence_n != *buf)
-                    {
-                        sequence_n = *buf;
-                    }
-                    else
-                    {
-                        state = IGNORE;
-                        printf("Repeated packet\n");
-                        break;
-                    }
-                }
-        */
+        // If data packet
+        if (i == 0)
+            data = (*buf == 1);
+
+        // Record sequence number
+        if (i == 1 && data)
+        {
+            if (sequence_n == *buf)
+            {
+                printf("\\%02x", *buf);
+                state = IGNORE;
+                printf("Repeated packet\n");
+                break;
+            }
+            sequence_n = *buf;
+        }
+
         if (*buf == FLAG)
         {
             printf("FLAG RCV\n");
@@ -354,7 +347,8 @@ int llread(unsigned char *packet)
         if (*buf == ESCAPE)
         {
             // byte destuffing
-            read(fd, buf, 1); // read next byte
+            while (*buf == 0x7d)
+                read(fd, buf, 1); // read next byte
             if (*buf == 0x5e)
             {
                 *buf = FLAG;
@@ -370,13 +364,13 @@ int llread(unsigned char *packet)
         i++;
     }
 
-    for (int w = 0; w < i; w++)
-        bcc2^= *(packet + w);
 
     if (bcc2 != 0)
     {
         printf("BCC2 not ok\n");
         state = REJECTED;
+        sequence_n = sequence_n-1;
+        printf("%02x\n", sequence_n);
     }
 
     *(packet + i) = '\0';
@@ -390,7 +384,7 @@ int llread(unsigned char *packet)
     buf[4] = FLAG;
 
     int bytes = write(fd, buf, RR_SIZE);
-    printf("Wrote RR with bytes:%d\n", bytes);
+    printf("Wrote %d with bytes:%d\n", state, bytes);
 
     if (state == REJECTED || state == IGNORE)
         return 0;
@@ -489,6 +483,8 @@ int llclose_tx()
     }
 
     printf("Sent UA\n");
+
+    sleep(1);
 
     return (state == STOP) ? 1 : -1;
 }

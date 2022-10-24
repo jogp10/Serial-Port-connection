@@ -68,8 +68,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
     else if (r == LlRx)
     {
         unsigned char control_packet[MAX_PAYLOAD_SIZE], data_packet[MAX_PAYLOAD_SIZE];
-        int size;
-
+        
         printf("Receiving START packet...\n");
         llread(control_packet);
 
@@ -79,12 +78,12 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         {
             if (bytes == 0) continue;
             
-            unsigned char buffer[BUF_SIZE - 1];
-
             if (data_packet[0] == 3)
                 break;
 
             fwrite(data_packet + 4, 1, bytes - 4, output);
+
+            sleep(0.5);
         }
     }
     else
