@@ -255,14 +255,17 @@ int llwrite(const unsigned char *buf, int bufSize)
         if (read(fd, _buf, 1) == 0)
             continue;
 
-        printf("\\%02x/", *_buf);
-
         // Process byte
         state = next_state(state, *_buf, A_SENDER, (RR | (Nr << 7)));
         if (state == STOP)
         {
             printf("Response received\n");
             break;
+        } else if (state == REJECTED)
+        {
+            printf("Response rejected\n");
+            read(fd, _buf, 1);
+            read(fd, _buf, 1);
         }
     }
 
@@ -431,7 +434,7 @@ int llclose_tx()
     alarmEnabled = FALSE;
     alarmCount = 0;
 
-    unsigned char buf[BUF_SIZE + 1] = {FLAG, A_SENDER, DISC, A_SENDER ^ DISC, FLAG, '\0'};
+    unsigned char buf[BUF_SIZE + 1] = {FLAG, A_SENDER, DISC, A_SENDER ^ DISC, FLAG}, _buf[BUF_SIZE];
 
     enum STATE state = START;
     while (alarmCount < nRetries && state != STOP)
@@ -440,7 +443,7 @@ int llclose_tx()
         {
             (void)signal(SIGALRM, alarmHandler);
 
-            write(fd, buf, DISC_SIZE);
+            write(fd, buf, DISC_SIZE - 1);
             fprintf(stderr, "DISC written from tx\n");
 
             state = START;
@@ -454,13 +457,13 @@ int llclose_tx()
 
         // Read from serial port
         // Returns after 1 chars have been input
-        int bytes = read(fd, buf, 1);
+        int bytes = read(fd, _buf, 1);
         if (bytes < 0)
             exit(-1);
         else if (bytes == 0)
             continue;
 
-        if ((state = next_state(state, *buf, A_RECEIVER, DISC)) == STOP)
+        if ((state = next_state(state, *_buf, A_RECEIVER, DISC)) == STOP)
         {
             printf("DISC received\n");
         }
@@ -506,6 +509,8 @@ int llclose_rx()
 
         if (state == IGNORE)
             state = START;
+
+        printf("Received %02x, state: %d\n", *buf, state);
 
         // Process byte
         if ((state = next_state(state, *buf, A_SENDER, DISC)) == STOP)
