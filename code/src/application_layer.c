@@ -25,7 +25,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
     // Open serial port
     if (!llopen(connectionParameters))
     {
-        printf("Error opening serial port");
+        printf("Error opening serial port\n");
         exit(-1);
     }
 
@@ -38,52 +38,75 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
     if (r == LlTx)
     {
         unsigned char buffer[MAX_PAYLOAD_SIZE + 1], control_packet[MAX_PAYLOAD_SIZE + 1];
-
-        // Mount Start Control packet
         int size = get_file_size(file);
-        mount_control_packet(control_packet, 2, size, filename);
 
         printf("Sending START control packet\n");
-        llwrite(control_packet, 5 + nBytes_to_represent(size) + strlen(filename));
+        mount_control_packet(control_packet, 2, size, filename);
 
-        printf("Sending file...\n");
+        if (llwrite(control_packet, 5 + nBytes_to_represent(size) + strlen(filename)) == -1)
+        {
+            printf("Error sending control packet\n");
+            llclose(0);
+            exit(-1);
+        }
+
+        printf("\nSending file...\n");
         int n = 0, sz;
         while ((sz = fread(buffer, 1, MAX_PAYLOAD_SIZE - 4, file)) > 0)
         {
-            printf("Packet read from file #%d\n", n);
-
-            // Mount data packet
+            printf("Mount Data Packet #%d\n", n);
             unsigned char data_packet[MAX_PAYLOAD_SIZE];
+            
             mount_data_packet(data_packet, buffer, sizeof(buffer), n);
             n++;
 
-            llwrite(data_packet, sz + 4);
+            if (llwrite(data_packet, sz + 4) == -1)
+            {
+                printf("Error sending data packet\n");
+                llclose(0);
+                exit(-1);
+            }
         }
 
-        printf("Sending END control packet\n");
+        printf("\nSending END control packet\n");
         mount_control_packet(control_packet, 3, size, filename);
 
-        llwrite(control_packet, 5 + nBytes_to_represent(sz) + strlen(filename));
+        if (llwrite(control_packet, 5 + nBytes_to_represent(sz) + strlen(filename)) == -1)
+        {
+            printf("Error sending control packet\n");
+            llclose(0);
+            exit(-1);
+        }
     }
     else if (r == LlRx)
     {
         unsigned char control_packet[MAX_PAYLOAD_SIZE], data_packet[MAX_PAYLOAD_SIZE];
-        
-        printf("Receiving START packet...\n");
-        llread(control_packet);
 
-        printf("Receiving file...\n");
-        int bytes;
-        while ((bytes = llread(data_packet)) >= 0)
+        printf("Receiving START packet...\n");
+        if (llread(control_packet) == -1)
         {
-            if (bytes == 0) continue;
-            
+            printf("Error receiving control packet\n");
+            llclose(0);
+            exit(-1);
+        }
+
+        printf("\nReceiving file...\n");
+        int bytes;
+        while (1)
+        {
+            printf("Mount Data Packet\n");
+            if ((bytes = llread(data_packet)) == -1)
+            {
+                printf("Error receiving data packet\n");
+                llclose(0);
+                exit(-1);
+            }
+                
+
             if (data_packet[0] == 3)
                 break;
 
             fwrite(data_packet + 4, 1, bytes - 4, output);
-
-            sleep(0.5);
         }
     }
     else
@@ -92,7 +115,9 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         exit(-1);
     }
 
-    printf("Disconnecting!\n");
+    sleep(4);
+
+    printf("\nDisconnecting!\n");
     if (!llclose(0))
     {
         printf("Error closing serial port\n");

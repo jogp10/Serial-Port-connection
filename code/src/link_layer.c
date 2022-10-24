@@ -86,7 +86,7 @@ int llopen(LinkLayer connectionParameters)
     {
         if (!llopen_rx())
         {
-            printf("Error opening serial port");
+            printf("Error opening serial port\n");
             exit(-1);
         }
     }
@@ -109,7 +109,7 @@ int llopen_tx()
             (void)signal(SIGALRM, alarmHandler);
 
             write(fd, buf, SET_SIZE);
-            fprintf(stderr, "SET written\n");
+            printf("SET written\n");
 
             state = START;
 
@@ -125,6 +125,9 @@ int llopen_tx()
                 exit(-1);
             continue;
         }
+
+        if (state == IGNORE)
+            state = START;
 
         // Process byte
         if ((state = next_state(state, *buf, A_SENDER, UA)) == STOP)
@@ -147,6 +150,9 @@ int llopen_rx()
     printf("Waiting for SET...\n");
     while (1)
     {
+        if (state == IGNORE)
+            state = START;
+
         int bytes;
         // Returns after 1 chars have been input
         if ((bytes = read(fd, buf, 1)) == 0)
@@ -162,9 +168,8 @@ int llopen_rx()
             break;
         }
     }
-    printf("Sending UA...\n");
 
-    // Send UA
+    printf("Sending UA...\n");
     buf[0] = FLAG;
     buf[1] = A_SENDER;
     buf[2] = UA;
@@ -172,8 +177,7 @@ int llopen_rx()
     buf[4] = FLAG;
 
     write(fd, buf, UA_SIZE);
-    fprintf(stderr, "UA written\n");
-
+    printf("UA written\n");
     return 1;
 }
 
@@ -190,7 +194,6 @@ int llwrite(const unsigned char *buf, int bufSize)
     enum STATE state = START;
 
     // Build frame
-    int i = 0;
     while (alarmCount < nRetries && state != STOP)
     {
         if (alarmEnabled == FALSE || state == REJECTED)
@@ -207,8 +210,12 @@ int llwrite(const unsigned char *buf, int bufSize)
 
             // Copy data
             int i, j = 0;
+            unsigned char bcc2 = 0;
             for (i = 0; i < bufSize; i++)
             {
+                // calculate bcc2
+                bcc2 ^= buf[i];
+
                 // byte stuffing
                 if (buf[i] == FLAG || buf[i] == ESCAPE)
                 {
@@ -222,13 +229,6 @@ int llwrite(const unsigned char *buf, int bufSize)
                 }
             }
 
-            // Calculate BCC2
-            unsigned char bcc2 = 0;
-            for (i = 0; i < bufSize; i++)
-            {
-                bcc2 ^= buf[i];
-            }
-
             if (bcc2 == FLAG || bcc2 == ESCAPE)
             {
                 _buf[4 + i + j] = ESCAPE;
@@ -239,7 +239,6 @@ int llwrite(const unsigned char *buf, int bufSize)
             {
                 _buf[4 + i + j] = bcc2;
             }
-
             _buf[5 + i + j] = FLAG;
 
             // Write frame
@@ -248,25 +247,24 @@ int llwrite(const unsigned char *buf, int bufSize)
                 exit(-1);
 
             state = START;
-
             alarm(timeout);
             alarmEnabled = TRUE;
         }
 
         // Returns after 1 chars have been input
-        read(fd, _buf, 1);
+        if (read(fd, _buf, 1) == 0)
+            continue;
+
+        printf("\\%02x/", *_buf);
 
         // Process byte
         state = next_state(state, *_buf, A_SENDER, (RR | (Nr << 7)));
         if (state == STOP)
         {
-            printf("RR received\n");
+            printf("Response received\n");
             break;
         }
-        i++;
     }
-
-    printf("\n");
 
     if (state == STOP)
     {
@@ -276,6 +274,7 @@ int llwrite(const unsigned char *buf, int bufSize)
     }
     else
     {
+        printf("Error: llwrite failed\n");
         return -1;
     }
 }
@@ -287,9 +286,9 @@ int llwrite(const unsigned char *buf, int bufSize)
 int llread(unsigned char *packet)
 {
     unsigned char buf[BUF_SIZE + 1]; // +1: Save space for the final '\0' char
+    enum STATE state = START;
 
     // Receive packet
-    enum STATE state = START;
     while (state != BCC_OK)
     {
         // Returns after 1 chars have been input
@@ -311,10 +310,11 @@ int llread(unsigned char *packet)
     // Read data
     unsigned char bcc2 = 0;
     int i = 0, data = 0;
-    while (state != STOP) 
+    while (state != STOP)
     {
-        if (state == IGNORE || state == REJECTED) break;
-        
+        if (state == IGNORE || state == REJECTED)
+            break;
+
         // Returns after 1 chars have been input
         if (read(fd, buf, 1) == 0)
             continue;
@@ -328,7 +328,7 @@ int llread(unsigned char *packet)
         {
             if (sequence_n == *buf)
             {
-                printf("\\%02x", *buf);
+                printf("\\%02x ", *buf);
                 state = IGNORE;
                 printf("Repeated packet\n");
                 break;
@@ -338,8 +338,6 @@ int llread(unsigned char *packet)
 
         if (*buf == FLAG)
         {
-            printf("FLAG RCV\n");
-            printf("%02x vs %02x\n", bcc2, bcc2 ^ *(packet + i - 1));
             state = STOP;
             break;
         }
@@ -349,6 +347,7 @@ int llread(unsigned char *packet)
             // byte destuffing
             while (*buf == 0x7d)
                 read(fd, buf, 1); // read next byte
+
             if (*buf == 0x5e)
             {
                 *buf = FLAG;
@@ -364,13 +363,11 @@ int llread(unsigned char *packet)
         i++;
     }
 
-
     if (bcc2 != 0)
     {
         printf("BCC2 not ok\n");
         state = REJECTED;
-        sequence_n = sequence_n-1;
-        printf("%02x\n", sequence_n);
+        sequence_n = sequence_n - 1;
     }
 
     *(packet + i) = '\0';
@@ -384,12 +381,10 @@ int llread(unsigned char *packet)
     buf[4] = FLAG;
 
     int bytes = write(fd, buf, RR_SIZE);
-    printf("Wrote %d with bytes:%d\n", state, bytes);
+    printf("Wrote %s with bytes:%d\n", state != REJECTED ? "RR" : "REJ", bytes);
 
     if (state == REJECTED || state == IGNORE)
         return 0;
-
-    printf("\n");
     return i;
 }
 
@@ -454,19 +449,27 @@ int llclose_tx()
             alarmEnabled = TRUE;
         }
 
+        if (state == IGNORE)
+            state = START;
+
         // Read from serial port
         // Returns after 1 chars have been input
-        int bytes;
-        if ((bytes = read(fd, buf, 1)) <= 0)
-        {
-            if (bytes < 0)
-                exit(-1);
+        int bytes = read(fd, buf, 1);
+        if (bytes < 0)
+            exit(-1);
+        else if (bytes == 0)
             continue;
-        }
+
         if ((state = next_state(state, *buf, A_RECEIVER, DISC)) == STOP)
         {
             printf("DISC received\n");
         }
+    }
+
+    if (state != STOP)
+    {
+        printf("Error: llclose failed\n");
+        return -1;
     }
 
     // Send UA
@@ -498,7 +501,11 @@ int llclose_rx()
     while (1)
     {
         // Returns after 1 chars have been input
-        read(fd, buf, 1);
+        if (read(fd, buf, 1) == 0)
+            continue;
+
+        if (state == IGNORE)
+            state = START;
 
         // Process byte
         if ((state = next_state(state, *buf, A_SENDER, DISC)) == STOP)
@@ -508,7 +515,6 @@ int llclose_rx()
         }
     }
 
-    // Send DISC
 
     // Mount DISC
     unsigned char _buf[BUF_SIZE + 1] = {FLAG, A_RECEIVER, DISC, A_RECEIVER ^ DISC, FLAG, '\0'};
@@ -525,7 +531,7 @@ int llclose_rx()
             (void)signal(SIGALRM, alarmHandler);
 
             write(fd, _buf, DISC_SIZE);
-            fprintf(stderr, "DISC written from rx\n");
+            printf("DISC written from rx\n");
 
             state = START;
 
@@ -533,15 +539,16 @@ int llclose_rx()
             alarmEnabled = TRUE;
         }
 
+        if (state == IGNORE)
+            state = START;
+
         // Read from serial port
-        // Returns after 1 chars have been input
-        int bytes;
-        if ((bytes = read(fd, _buf, 1)) <= 0)
-        {
-            if (bytes < 0)
-                exit(-1);
+        int bytes = read(fd, _buf, 1);
+        if (bytes < 0)
+            exit(-1);
+        if (bytes == 0)
             continue;
-        }
+    
 
         if ((state = next_state(state, *_buf, A_RECEIVER, UA)) == STOP)
         {
