@@ -329,15 +329,14 @@ int llread(unsigned char *packet)
         // Record sequence number
         if (i == 1 && data)
         {
+            printf("#%d \n", *buf);
             if (sequence_n == *buf)
             {
-                printf("\\%02x ", *buf);
                 state = IGNORE;
                 printf("Repeated packet\n");
                 break;
             }
             sequence_n = *buf;
-            printf("#%d \n", *buf);
         }
 
         if (*buf == FLAG)
