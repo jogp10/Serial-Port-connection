@@ -337,6 +337,7 @@ int llread(unsigned char *packet)
                 break;
             }
             sequence_n = *buf;
+            printf("#%d \n", *buf);
         }
 
         if (*buf == FLAG)
@@ -384,7 +385,7 @@ int llread(unsigned char *packet)
     buf[4] = FLAG;
 
     int bytes = write(fd, buf, RR_SIZE);
-    printf("Wrote %s with bytes:%d\n", state != REJECTED ? "RR" : "REJ", bytes);
+    printf("Wrote %s\n", state != REJECTED ? "RR" : "REJ");
 
     if (state == REJECTED || state == IGNORE)
         return 0;
@@ -443,7 +444,7 @@ int llclose_tx()
         {
             (void)signal(SIGALRM, alarmHandler);
 
-            write(fd, buf, DISC_SIZE - 1);
+            write(fd, buf, DISC_SIZE);
             fprintf(stderr, "DISC written from tx\n");
 
             state = START;
@@ -490,7 +491,7 @@ int llclose_tx()
 
     printf("Sent UA\n");
 
-    sleep(1);
+    sleep(0.5);
 
     return (state == STOP) ? 1 : -1;
 }
@@ -509,8 +510,6 @@ int llclose_rx()
 
         if (state == IGNORE)
             state = START;
-
-        printf("Received %02x, state: %d\n", *buf, state);
 
         // Process byte
         if ((state = next_state(state, *buf, A_SENDER, DISC)) == STOP)

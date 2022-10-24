@@ -29,8 +29,6 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         exit(-1);
     }
 
-    printf("New termios structure set\n");
-
     FILE *file = fopen(filename, "r");
     FILE *output = fopen("penguin-received.gif", "w");
 
@@ -40,7 +38,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         unsigned char buffer[MAX_PAYLOAD_SIZE + 1], control_packet[MAX_PAYLOAD_SIZE + 1];
         int size = get_file_size(file);
 
-        printf("Sending START control packet\n");
+        printf("\nSending START control packet\n");
         mount_control_packet(control_packet, 2, size, filename);
 
         if (llwrite(control_packet, 5 + nBytes_to_represent(size) + strlen(filename)) == -1)
@@ -50,7 +48,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
             exit(-1);
         }
 
-        printf("\nSending file...\n");
+        printf("Sending file...\n");
         int n = 0, sz;
         while ((sz = fread(buffer, 1, MAX_PAYLOAD_SIZE - 4, file)) > 0)
         {
@@ -68,7 +66,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
             }
         }
 
-        printf("\nSending END control packet\n");
+        printf("Sending END control packet\n");
         mount_control_packet(control_packet, 3, size, filename);
 
         if (llwrite(control_packet, 5 + nBytes_to_represent(sz) + strlen(filename)) == -1)
@@ -94,15 +92,13 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         int bytes;
         while (1)
         {
-            printf("Mount Data Packet\n");
+            printf("Reading Data Packet ");
             if ((bytes = llread(data_packet)) == -1)
             {
                 printf("Error receiving data packet\n");
                 llclose(0);
                 exit(-1);
             }
-                
-
             if (data_packet[0] == 3)
                 break;
 
@@ -114,8 +110,6 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         printf("Invalid role: %s\n", role);
         exit(-1);
     }
-
-    sleep(4);
 
     printf("\nDisconnecting!\n");
     if (!llclose(0))
