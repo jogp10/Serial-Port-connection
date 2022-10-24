@@ -245,7 +245,7 @@ int llwrite(const unsigned char *buf, int bufSize)
             if (bytes < 0)
                 exit(-1);
 
-            printf("\nSent %d bytes\n", bytes);
+            printf("Sent %d bytes\n", bytes);
 
             state = START;
 
@@ -265,6 +265,8 @@ int llwrite(const unsigned char *buf, int bufSize)
         }
         i++;
     }
+
+    rintf("\n");
 
     if (state == STOP)
     {
@@ -314,10 +316,10 @@ int llread(unsigned char *packet)
         // Returns after 1 chars have been input
         if (read(fd, buf, 1) == 0)
             continue;
-
+/*
         // If data packet
         if (i == 0)
-            data = (*buf == 2);
+            data = (*buf == 1);
 
         // Record sequence number
         if (i == 1 && data)
@@ -333,10 +335,11 @@ int llread(unsigned char *packet)
                 break;
             }
         }
-
+*/
         if (*buf == FLAG)
         {
             printf("FLAG RCV\n");
+            printf("%02x vs %02x\n", bcc2, *(packet + i - 1));
             if (bcc2 != 0)
             {
                 printf("BCC2 not ok\n");
@@ -344,8 +347,9 @@ int llread(unsigned char *packet)
                 break;
             }
             state = STOP;
-            i--;
+            
             *(packet + i) = '\0';
+            i--;
             break;
         }
 
@@ -377,11 +381,12 @@ int llread(unsigned char *packet)
     buf[4] = FLAG;
 
     int bytes = write(fd, buf, RR_SIZE);
-    printf("\nWrote RR with bytes:%d\n", bytes);
+    printf("Wrote RR with bytes:%d\n", bytes);
 
     if (state == REJECTED || state == IGNORE)
         return 0;
 
+    printf("\n");
     return i;
 }
 
