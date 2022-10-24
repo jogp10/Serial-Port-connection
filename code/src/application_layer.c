@@ -49,21 +49,28 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         }
 
         printf("Sending file...\n");
-        int n = 0, sz;
+        int n = 0, sz, bytes;
         while ((sz = fread(buffer, 1, MAX_PAYLOAD_SIZE - 4, file)) > 0)
         {
             printf("Mount Data Packet #%d\n", n);
             unsigned char data_packet[MAX_PAYLOAD_SIZE];
-            
-            mount_data_packet(data_packet, buffer, sizeof(buffer), n);
-            n++;
 
-            if (llwrite(data_packet, sz + 4) == -1)
+            mount_data_packet(data_packet, buffer, sizeof(buffer), n);
+
+            while (1)
             {
-                printf("Error sending data packet\n");
-                llclose(0);
-                exit(-1);
+                if ((bytes = llwrite(data_packet, sz + 4)) == -1)
+                {
+                    printf("Error sending data packet\n");
+                    llclose(0);
+                    exit(-1);
+                }
+
+                if (bytes > 0)
+                    break;
             }
+
+            n++;
         }
 
         printf("Sending END control packet\n");
@@ -102,7 +109,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
             if (data_packet[0] == 3)
                 break;
 
-            fwrite(data_packet + 4, 1, bytes - 4, output);
+            if (bytes > 0) fwrite(data_packet + 4, 1, bytes - 4, output);
         }
     }
     else

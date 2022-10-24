@@ -386,7 +386,7 @@ int llread(unsigned char *packet)
     int bytes = write(fd, buf, RR_SIZE);
     printf("Wrote %s\n", state != REJECTED ? "RR" : "REJ");
 
-    if (state == REJECTED || state == IGNORE)
+    if (state == REJECTED)
         return 0;
     return i;
 }
