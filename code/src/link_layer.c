@@ -246,7 +246,14 @@ int llwrite(const unsigned char *buf, int bufSize)
                 exit(-1);
 
             printf("Sent %d bytes\n", bytes);
+            printf("before buffing:\n");
+            for (int w = 0; w < 6 + i + j; w++)
+                printf("%02x ", _buf[w]);
+            printf("after buffing:\n");
+            for (int w = 0; w < bufSize; w++)
+                printf("%02x ", buf[w]);
 
+            printf("\n");
             state = START;
 
             alarm(timeout);
@@ -266,7 +273,7 @@ int llwrite(const unsigned char *buf, int bufSize)
         i++;
     }
 
-    rintf("\n");
+    printf("\n");
 
     if (state == STOP)
     {
@@ -316,40 +323,31 @@ int llread(unsigned char *packet)
         // Returns after 1 chars have been input
         if (read(fd, buf, 1) == 0)
             continue;
-/*
-        // If data packet
-        if (i == 0)
-            data = (*buf == 1);
+        /*
+                // If data packet
+                if (i == 0)
+                    data = (*buf == 1);
 
-        // Record sequence number
-        if (i == 1 && data)
-        {
-            if (sequence_n != *buf)
-            {
-                sequence_n = *buf;
-            }
-            else
-            {
-                state = IGNORE;
-                printf("Repeated packet\n");
-                break;
-            }
-        }
-*/
+                // Record sequence number
+                if (i == 1 && data)
+                {
+                    if (sequence_n != *buf)
+                    {
+                        sequence_n = *buf;
+                    }
+                    else
+                    {
+                        state = IGNORE;
+                        printf("Repeated packet\n");
+                        break;
+                    }
+                }
+        */
         if (*buf == FLAG)
         {
             printf("FLAG RCV\n");
-            printf("%02x vs %02x\n", bcc2, *(packet + i - 1));
-            if (bcc2 != 0)
-            {
-                printf("BCC2 not ok\n");
-                state = REJECTED;
-                break;
-            }
+            printf("%02x vs %02x\n", bcc2, bcc2 ^ *(packet + i - 1));
             state = STOP;
-            
-            *(packet + i) = '\0';
-            i--;
             break;
         }
 
@@ -370,8 +368,19 @@ int llread(unsigned char *packet)
         // Copy data
         *(packet + i) = *buf;
         i++;
-        bcc2 ^= *buf;
     }
+
+    for (int w = 0; w < i; w++)
+        bcc2^= *(packet + w);
+
+    if (bcc2 != 0)
+    {
+        printf("BCC2 not ok\n");
+        state = REJECTED;
+    }
+
+    *(packet + i) = '\0';
+    i--;
 
     // Send RR or REJ
     buf[0] = FLAG;
