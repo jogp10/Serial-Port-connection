@@ -66,8 +66,6 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
                     exit(-1);
                 }
 
-                sleep(1);
-
                 if (bytes > 0)
                     break;
             }

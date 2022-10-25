@@ -445,7 +445,7 @@ int llclose_tx()
             (void)signal(SIGALRM, alarmHandler);
 
             write(fd, buf, DISC_SIZE);
-            fprintf(stderr, "DISC written from tx\n");
+            printf("DISC written from tx\n");
 
             state = START;
 
