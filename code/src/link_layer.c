@@ -364,6 +364,7 @@ int llread(unsigned char *packet)
         // Copy data
         *(packet + i) = *buf;
         i++;
+        bcc2 ^= *buf;
     }
 
     if (bcc2 != 0)
