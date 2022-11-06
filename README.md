@@ -1,4 +1,4 @@
-# RCOMfirst
+# Serial Port connection
 
 Virtual Serial Ports
   <br>Terminal 0:
